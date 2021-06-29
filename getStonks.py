@@ -19,11 +19,9 @@ linkbase = "https://money.cnn.com/quote/forecast/forecast.html?symb="
 
 for stock in stocks.keys():
     stocksym = stocks[stock]
-    print stock, "["+stocksym+"]"
-    link = linkbase+stocksym
-    r2 = requests.get(link)
-
-    soup = BeautifulSoup(r2.text,"lxml")
+    link      = linkbase+stocksym
+    request   = requests.get(link)
+    soup      = BeautifulSoup(request.text,"lxml")
     valheader = soup.find(class_='wsod_last')
 
 
@@ -43,13 +41,19 @@ for stock in stocks.keys():
     exp_perc = numbers[5]
     act_val2 = numbers[6]
 
-
+    col_ini = CEND
+    if   "-" in exp_perc : col_ini = '\033[31m'
+    elif "+" in exp_perc : col_ini =  '\033[32m'
+    col_end = CEND
+    
+    
     if float(act_val) != float(act_val2):
         print CRED + "Error, numbers "+act_val+" and "+act_val2+" are different!" + CEND
 
-    print "current value:", act_val
+    print stock, "["+stocksym+"]"
+    print "current value:", '\033[34m'+act_val+col_end
     print "expected value in "+nmonths+" months:", exp_val, "all "+nrecos+" analysis fall within ["+exp_max+","+exp_min+"]"
-    print "Current average gain:", exp_perc
+    print "Current average gain:", col_ini+exp_perc+col_end
 
 
     csvexist= os.path.exists(csvname)
