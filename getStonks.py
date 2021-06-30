@@ -12,11 +12,11 @@ def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min, nrecos
         writer   = csv.writer(f, delimiter = '\t')
         titlerow = stock+"\t["+stocksym+"]\t" 
         if csvexist is False : writer.writerow(['stock','abrv' , 'variable', str(today)])
-        writer.writerow([stock, stocksym, "act_val ", act_val])
-        writer.writerow([stock, stocksym, "exp_val ", exp_val])
-        writer.writerow([stock, stocksym, "exp_min ", exp_max])
-        writer.writerow([stock, stocksym, "exp_max ", exp_min])
-        writer.writerow([stock, stocksym, "n_recom ", nrecos ])
+        writer.writerow([stock, stocksym, "act_val", act_val])
+        writer.writerow([stock, stocksym, "exp_val", exp_val])
+        writer.writerow([stock, stocksym, "exp_max", exp_max])
+        writer.writerow([stock, stocksym, "exp_min", exp_min])
+        writer.writerow([stock, stocksym, "n_recom", nrecos ])
         writer.writerow("")
 
 CRED = '\033[91m'
@@ -90,7 +90,7 @@ for stock in stocks_esp.keys():
     exp_perc = round(100*(float(today_exp_val)-float(today_act_val))/float(today_act_val),2)
 
     printValues(stock, stock, today_act_val, today_exp_val, today_exp_val, today_exp_val, exp_perc, nrecos, nmonths)
-    writeCSV(csvname, stock, stock, today_act_val, today_exp_val, today_exp_val, today_exp_val, nrecos)
+    writeCSV(csvname, stock, stock.split(' ')[0], today_act_val, today_exp_val, today_exp_val, today_exp_val, nrecos)
 
 stocks_cnn = {"Alibaba" : "BABA", "Airbus" : "EADSY", "Curevac"   : "CVAC",
               "Arcelor" : "MT"  , "TSMC  " : "TSM"  , "Dr Horton" : "DHI" ,
