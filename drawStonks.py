@@ -16,17 +16,22 @@ print bool('act_val' == stocks["variable"][0])
 print  stocks[stocks["variable"] == "act_val"] 
 #print [stocks["variable"]=="act_val"]
 
-actval = stocks[stocks["variable"]=="act_val"][str(today)]
-expval = stocks[stocks["variable"]=="exp_val"][str(today)]
-expmax = stocks[stocks["variable"]=="exp_max"][str(today)]
-expmin = stocks[stocks["variable"]=="exp_min"][str(today)]
-#expran = [expval-expmin,expmax-expval]
-expminrel = expval.reset_index()-expmin.reset_index()
-expmaxrel = expmax.reset_index()-expval.reset_index()
+act_val = stocks[stocks["variable"]=="act_val"][today]
+exp_val = stocks[stocks["variable"]=="exp_val"][today]
+exp_max = stocks[stocks["variable"]=="exp_max"][today]
+exp_min = stocks[stocks["variable"]=="exp_min"][today]
 
-expran = np.array(list(zip(expminrel[str(today)], expmaxrel[str(today)]))).T
+act_relval    = 100*act_val/act_val
+exp_relval    = 100*(exp_val.reset_index()/act_val.reset_index())[today]
+exp_mindif    = exp_val.reset_index()-exp_min.reset_index()
+exp_maxdif    = exp_max.reset_index()-exp_val.reset_index()
+exp_minreldif = 100*exp_mindif.reset_index()/act_val.reset_index()
+exp_maxreldif = 100*exp_mindif.reset_index()/act_val.reset_index()
 
-difference = actval.reset_index() -expval.reset_index()
+exp_ran    = np.array(list(zip(exp_mindif[today], exp_maxdif[today]))).T
+exp_relran = np.array(list(zip(exp_minreldif[today], exp_maxreldif[today]))).T
+
+difference = act_val.reset_index() -exp_val.reset_index()
 colors = []
 print difference
 for dif in difference[today]:
@@ -34,8 +39,8 @@ for dif in difference[today]:
     else: colors.append('r')
 
 plt.gcf().subplots_adjust(bottom=0.15)
-plt.scatter(stocknms, actval, marker="_",label="Stock value at "+str(today), color=colors)
-plt.errorbar(stocknms, expval, yerr =expran, fmt='.', color='blue', label="expected value")
+plt.scatter(stocknms, act_val, marker="_",label="Stock value at "+today, color=colors)
+plt.errorbar(stocknms, exp_val, yerr =exp_ran, fmt='.', color='blue', label="expected value")
 plt.ylabel("Prize [USD]")
 plt.xlabel("Stock name")
 plt.title("Stock prize vs forecast")
@@ -43,4 +48,17 @@ plt.legend()
 plt.tick_params(axis='x', rotation=45)
 plt.savefig("absolute_difference.pdf")
 
-plt.clear()
+plt.clf()
+#print len(stocknms), len(act_relval), len(colors)
+
+print exp_relval, "\n neew", stocknms
+#plt.axhline(y=1)
+plt.scatter(stocknms, act_relval, marker="_",label="Stock value at "+today, color=colors)
+plt.errorbar(stocknms, exp_relval, yerr =exp_relran, fmt='.', color='blue', label="expected value")
+plt.ylabel("Percentage change")
+plt.xlabel("Stock name")
+plt.title("Relative expected gain/loss")
+plt.legend()
+plt.tick_params(axis='x', rotation=45)
+
+plt.savefig("relative_difference.pdf")

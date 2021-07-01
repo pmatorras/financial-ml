@@ -104,7 +104,6 @@ for stock in stocks_cnn.keys():
     soup      = BeautifulSoup(request.text,"lxml")
     valheader = soup.find(class_='wsod_last')
 
-
     act_val = getBetween(str(valheader), '"ToHundredth">', "</span")
     name = str(soup.find(class_="wsod_fLeft wsod_narrowH1Container"))
     #print soup.find_all('p')
