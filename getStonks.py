@@ -1,6 +1,10 @@
 import requests, json, re, csv, os
 from bs4 import BeautifulSoup
 from datetime import datetime
+import pandas as pd
+import requests
+
+
 now = datetime.now()
 today = datetime.date(now)
 def getBetween(string, before, after):
@@ -39,14 +43,61 @@ os.system('rm '+csvname)
 
 
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
-stocks_wsj = {"PROSUS N.V." : ["PRX", "NL/XAMS/"], "Volkswagen" : ["VOW3", "XE/XETR/"]}
+stocks_wsj = {"PROSUS N.V." : ["PRX" , "NL/XAMS/"],
+              "Volkswagen"  : ["VOW3", "XE/XETR/"]}
+stocks_esp = {"LOGISTA"             : ["logista_hlgd_sa"       ,"56747"],
+              "ORYZON GENOMICS"     : ["oryzon_genomics_sa"    ,"57000"] ,
+              "GRENERGY RENOVABLES" : ["grenergy_renovables_sa","56988"]}
+
+stocks_cnn = {"Alibaba" : "BABA", "Airbus" : "EADSY", "Curevac"   : "CVAC",
+              "Arcelor" : "MT"  , "TSMC  " : "TSM"  , "Dr Horton" : "DHI" ,
+              "Total"   : "TOT"}
+
+linkbase = {"cnn"       : "https://money.cnn.com/quote/forecast/forecast.html?symb=",
+            "wsj"       : "https://www.wsj.com/market-data/quotes/",
+            "cincodias" : "https://cincodias.elpais.com/mercados/empresas/"}
 
 def makeSoup(link):
     request   = requests.get(link, headers=headers)
     return  BeautifulSoup(request.text,"lxml")
-    #return  BeautifulSoup(request.text,'html.parser')
 
+#Find symbol similar to name
+def get_symbol(stock, country):
+    url = "https://www.marketwatch.com/tools/quotes/lookup.asp?siteID=mktw&Lookup="+stock+"&Country="+country+"&Type=all"#Stock"
+    print stock, country
+    print url
+    soup    = makeSoup(url)
+    results = soup.findAll(class_="results")
+    if stock[:3] not in str(results[0]).split("title=")[1].split(">")[0].upper():
+        print CRED + "Stock: " + stock + " different from " + str(results[0]).split("title=")[1].split(">")[0] + CEND
+    else:     print str(results[0]).split("title=")[1].split(">")[1].split("<")[0]
 
+#Read names from Portfolio.csv
+def readNames(inputfile):
+    with open(inputfile) as csvfile:
+        reader     = csv.reader(csvfile, delimiter=',')
+        names      = []
+        countries  = []
+        currencies = []
+        for row in reader:
+            if "cash" in row[0].lower() or "Producto" in row[0] or "ISHARES" in row[0] : continue
+            long_name = row[0].split(' ')
+            name      = row[0]
+            country   = row[1][:2]
+            currency  = row[4][:3]
+            if "NL" in country and "prosus" not in name.lower():
+                if "USD" in currency: country = "US"
+                else: country = "DE"
+            if long_name[len(long_name)-1]  == "COMM": name = name.replace('COMM','')
+            name = name.replace("REGISTERED","").replace("NY","").replace("S.A.","").replace("INC","").replace(" ","+").replace("GROUP","").replace("HOLDING","").strip()
+            if "TOTAL"  in name: name +="Energies"
+            names     .append(name)
+            countries .append(country)
+            currencies.append(currency)
+            get_symbol(name, country)
+    return [names, countries, currencies]
+
+results = readNames("Portfolio.csv")
 
 for stock in stocks_wsj.keys():
     link = "https://www.wsj.com/market-data/quotes/"+stocks_wsj[stock][1]+stocks_wsj[stock][0]+"/research-ratings"
@@ -73,7 +124,6 @@ for stock in stocks_wsj.keys():
     printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
 
 
-stocks_esp = {"LOGISTA" : ["logista_hlgd_sa","56747"], "ORYZON GENOMICS" : ["oryzon_genomics_sa", "57000"] , "GRENERGY RENOVABLES" : ["grenergy_renovables_sa","56988"]}
 
 for stock in stocks_esp.keys():
     link      = "https://cincodias.elpais.com/mercados/empresas/"+stocks_esp[stock][0]+"/"+stocks_esp[stock][1]+"/recomendaciones/"
@@ -92,14 +142,10 @@ for stock in stocks_esp.keys():
     printValues(stock, stock, today_act_val, today_exp_val, today_exp_val, today_exp_val, exp_perc, nrecos, nmonths)
     writeCSV(csvname, stock, stock.split(' ')[0], today_act_val, today_exp_val, today_exp_val, today_exp_val, nrecos)
 
-stocks_cnn = {"Alibaba" : "BABA", "Airbus" : "EADSY", "Curevac"   : "CVAC",
-              "Arcelor" : "MT"  , "TSMC  " : "TSM"  , "Dr Horton" : "DHI" ,
-              "Total"   : "TOT"}
-linkbase = "https://money.cnn.com/quote/forecast/forecast.html?symb="
 
 for stock in stocks_cnn.keys():
     stocksym  = stocks_cnn[stock]
-    link      = linkbase+stocksym
+    link      = linkbase["cnn"]+stocksym
     request   = requests.get(link)
     soup      = BeautifulSoup(request.text,"lxml")
     valheader = soup.find(class_='wsod_last')
