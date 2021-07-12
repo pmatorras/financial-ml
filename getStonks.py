@@ -2,25 +2,31 @@ import requests, json, re, csv, os
 from bs4 import BeautifulSoup
 from datetime import datetime
 import pandas as pd
-import requests
+import requests, sys
+now    = datetime.now()
+today  = datetime.date(now)
+foldir = os.path.dirname(sys.argv[0])
 
-
-now = datetime.now()
-today = datetime.date(now)
 def getBetween(string, before, after):
     return string.split(before)[1].split(after)[0]
 
-def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min, nrecos):
+def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min,recos, nrecos):
+    if "/" not in csvname: csvname =  foldir+"/"+csvname
     csvexist= os.path.exists(csvname)
     with open(csvname, 'a') as f:
         writer   = csv.writer(f, delimiter = '\t')
         titlerow = stock+"\t["+stocksym+"]\t" 
         if csvexist is False : writer.writerow(['stock','abrv' , 'variable', str(today)])
-        writer.writerow([stock, stocksym, "act_val", act_val])
-        writer.writerow([stock, stocksym, "exp_val", exp_val])
-        writer.writerow([stock, stocksym, "exp_max", exp_max])
-        writer.writerow([stock, stocksym, "exp_min", exp_min])
-        writer.writerow([stock, stocksym, "n_recom", nrecos ])
+        writer.writerow([stock, stocksym, "act_val", act_val  ])
+        writer.writerow([stock, stocksym, "exp_val", exp_val  ])
+        writer.writerow([stock, stocksym, "exp_max", exp_max  ])
+        writer.writerow([stock, stocksym, "exp_min", exp_min  ])
+        writer.writerow([stock, stocksym, "buy"    , recos[0] ])
+        writer.writerow([stock, stocksym, "overw"  , recos[1] ])
+        writer.writerow([stock, stocksym, "hold"   , recos[2] ])
+        writer.writerow([stock, stocksym, "underw" , recos[3] ])
+        writer.writerow([stock, stocksym, "sell"   , recos[4] ])
+        writer.writerow([stock, stocksym, "n_recom", nrecos   ])
         writer.writerow("")
 
 CRED = '\033[91m'
@@ -49,15 +55,16 @@ stocks_esp = {"LOGISTA"             : ["logista_hlgd_sa"       ,"56747"],
               "ORYZON GENOMICS"     : ["oryzon_genomics_sa"    ,"57000"] ,
               "GRENERGY RENOVABLES" : ["grenergy_renovables_sa","56988"]}
 
-stocks_cnn = {"Alibaba" : "BABA", "Airbus" : "EADSY", "Curevac"   : "CVAC",
-              "Arcelor" : "MT"  , "TSMC  " : "TSM"  , "Dr Horton" : "DHI" ,
-              "Total"   : "TOT"}
+stocks_cnn = {"Alibaba" : ["BABA"], "Airbus" : ["EADSY"], "Curevac"   : ["CVAC"],
+              "Arcelor" : ["MT"  ], "TSMC  " : ["TSM"  ], "Dr Horton" : ["DHI" ],
+              "Total"   : ["TOT"]}
 
-linkbase = {"cnn"       : "https://money.cnn.com/quote/forecast/forecast.html?symb=",
-            "wsj"       : "https://www.wsj.com/market-data/quotes/",
-            "cincodias" : "https://cincodias.elpais.com/mercados/empresas/"}
+linkbase = {"cnn" : "https://money.cnn.com/quote/forecast/forecast.html?symb=",
+            "wsj" : "https://www.wsj.com/market-data/quotes/",
+            "esp" : "https://cincodias.elpais.com/mercados/empresas/"}
 
 def makeSoup(link):
+    print link
     request   = requests.get(link, headers=headers)
     return  BeautifulSoup(request.text,"lxml")
 
@@ -70,15 +77,20 @@ def get_symbol(stock, country):
     results = soup.findAll(class_="results")
     if stock[:3] not in str(results[0]).split("title=")[1].split(">")[0].upper():
         print CRED + "Stock: " + stock + " different from " + str(results[0]).split("title=")[1].split(">")[0] + CEND
-    else:     print str(results[0]).split("title=")[1].split(">")[1].split("<")[0]
-
+        symbol = 'NOT_DO'
+    else:
+        symbol = str(results[0]).split("title=")[1].split(">")[1].split("<")[0]
+        print "symbol:","\033[34m"+ symbol + CEND 
+    return symbol
 #Read names from Portfolio.csv
 def readNames(inputfile):
+    if "/" not in inputfile: inputfile =  foldir+"/"+inputfile
     with open(inputfile) as csvfile:
         reader     = csv.reader(csvfile, delimiter=',')
         names      = []
         countries  = []
         currencies = []
+        symbols    = []
         for row in reader:
             if "cash" in row[0].lower() or "Producto" in row[0] or "ISHARES" in row[0] : continue
             long_name = row[0].split(' ')
@@ -94,86 +106,122 @@ def readNames(inputfile):
             names     .append(name)
             countries .append(country)
             currencies.append(currency)
-            get_symbol(name, country)
-    return [names, countries, currencies]
+            symbols   .append(get_symbol(name, country))
+    return [names,symbols, currencies, countries]
 
-results = readNames("Portfolio.csv")
+def getStocks(stocks, type_i):
+    for stock in stocks.keys():
+        if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
+        else:
+            if "esp"   in stocks[stock][-1].lower():
+                stockType = 'esp'
+            elif ":"   in stocks[stock][0]:
+                stockType ='wsj'
+            else:
+                stockType = 'cnn'
+        nmonths = '12'
+        print stock, stocks[stock], stockType
+        if "wsj" in stockType:
+            stockall = stocks[stock]
+            if ":" in stockall[0]:
+                print "and here"
+                stocksym = stockall[0].split(":")[1]
+                if stocksym == "AIRA" : stocksym = "AIR"
+                print "stockall", stockall
+                if "DE" in stockall[0]:
+                    stockmar = "XE/XETR/"
+                elif "NL" in stockall[0]:
+                    stockmar = "NL/XAMS/"
+            else:
+                stocksym = stockall[0]
+                stockmar = stockall[1]
+                
+            link       = linkbase["wsj"]+stockmar+stocksym+"/research-ratings"
+            soup       = makeSoup(link)
+            reco_table =  soup.find(class_="cr_analystRatings cr_data module").find(class_="cr_dataTable").findAll(class_="data_data")
+            recos      = []
+            for i in range(2,len(reco_table),3):
+                recos.append(int(getBetween(str(reco_table[i]),">","<")))
 
-for stock in stocks_wsj.keys():
-    link = "https://www.wsj.com/market-data/quotes/"+stocks_wsj[stock][1]+stocks_wsj[stock][0]+"/research-ratings"
-    soup = makeSoup(link)
-    stocksym   = stocks_wsj[stock][0]
-    reco_table =  soup.find(class_="cr_analystRatings cr_data module").find(class_="cr_dataTable")
-    buy    = str(reco_table.findAll(class_="data_data")[2 ]).split(">")[1].split("<")[0]
-    overw  = str(reco_table.findAll(class_="data_data")[5 ]).split(">")[1].split("<")[0]
-    hold   = str(reco_table.findAll(class_="data_data")[8 ]).split(">")[1].split("<")[0]
-    underw = str(reco_table.findAll(class_="data_data")[11]).split(">")[1].split("<")[0]
-    sell   = str(reco_table.findAll(class_="data_data")[14]).split(">")[1].split("<")[0]
-    prices = soup.find(class_="cr_data rr_stockprice module").findAll(class_="data_data")
+            nrecos = sum(recos)
+            prices = soup.find(class_="cr_data rr_stockprice module").findAll(class_="data_data")
 
-    exp_max  = getBetween(str(prices[0]), "/sup>", "</span")
-    exp_min  = getBetween(str(prices[2]), "/sup>", "</span")
-    exp_med  = getBetween(str(prices[1]), "/sup>", "</span")
-    exp_avg  = getBetween(str(prices[3]), "/sup>", "</span")
-    act_val  = getBetween(str(prices[4]), "/sup>", "</span")
-    exp_perc = round(100*(float(exp_med)-float(act_val))/float(act_val),2)
-    nrecos   = int(buy)+int(overw)+int(hold)+int(underw)+int(sell)
-    nmonths  = '12'
+            exp_max  = getBetween(str(prices[0]), "/sup>", "</span")
+            exp_min  = getBetween(str(prices[2]), "/sup>", "</span")
+            exp_med  = getBetween(str(prices[1]), "/sup>", "</span")
+            exp_avg  = getBetween(str(prices[3]), "/sup>", "</span")
+            act_val  = getBetween(str(prices[4]), "/sup>", "</span")
+            exp_perc = round(100*(float(exp_med)-float(act_val))/float(act_val),2)
 
-    writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, nrecos)
-    printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
+        elif "esp" in stockType:
+            stocksym    = stock.split(' ')[0]
+            link        = linkbase["esp"]+stocks[stock][0]+"/"+stocks[stock][1]+"/recomendaciones/"
+            soup        = makeSoup(link)
+            dataset     = soup.text.split("var barChartData =")[1].split('};')[0]
+            recommend   =  soup.text.split("Tendencia de las recomendaciones")[1].split("*La")[0]
+            all_act_val = getBetween(dataset.split('Precio real')[1].split('data')[1], '[', ']')
+            all_exp_med = getBetween(dataset.split('Precio objetivo')[1].split('data')[1], '[', ']')
+            act_val     = all_act_val.replace("\n\n","").split(',')[1]
+            exp_med     = all_exp_med.replace("\n\n","").split(',')[1]
+            exp_max     = exp_med
+            exp_min     = exp_med
+            recos       = recommend.split("Hoy\n")[1].split("*")[0].split("\n")
+            nrecos      = recos[5]
+            exp_perc    = round(100*(float(exp_med)-float(act_val))/float(act_val),2)
 
-
-
-for stock in stocks_esp.keys():
-    link      = "https://cincodias.elpais.com/mercados/empresas/"+stocks_esp[stock][0]+"/"+stocks_esp[stock][1]+"/recomendaciones/"
-    request   = requests.get(link)
-    soup      = BeautifulSoup(request.text,"lxml")
-    dataset   = soup.text.split("var barChartData =")[1].split('};')[0]
-    recommend =  soup.text.split("Tendencia de las recomendaciones")[1].split("*La")[0]
-    act_val   = getBetween(dataset.split('Precio real')[1].split('data')[1], '[', ']')
-    exp_val   = getBetween(dataset.split('Precio objetivo')[1].split('data')[1], '[', ']')
-    today_exp_val   = exp_val.replace("\n\n","").split(',')[1]
-    today_act_val   = act_val.replace("\n\n","").split(',')[1]
-    today_recommend = recommend.split("Hoy\n")[1].split("*")[0].split("\n")
-    nrecos   = today_recommend[5]
-    exp_perc = round(100*(float(today_exp_val)-float(today_act_val))/float(today_act_val),2)
-
-    printValues(stock, stock, today_act_val, today_exp_val, today_exp_val, today_exp_val, exp_perc, nrecos, nmonths)
-    writeCSV(csvname, stock, stock.split(' ')[0], today_act_val, today_exp_val, today_exp_val, today_exp_val, nrecos)
+        elif "cnn" in stockType:
+            stocksym  = stocks[stock][0]
+            
+            link      = linkbase["cnn"]+stocksym
+            request   = requests.get(link)
+            soup      = BeautifulSoup(request.text,"lxml")
+            valheader = soup.find(class_='wsod_last')
+            print link
+            act_val = getBetween(str(valheader), '"ToHundredth">', "</span")
+            name = str(soup.find(class_="wsod_fLeft wsod_narrowH1Container"))
+            #print soup.find_all('p')
 
 
-for stock in stocks_cnn.keys():
-    stocksym  = stocks_cnn[stock]
-    link      = linkbase["cnn"]+stocksym
-    request   = requests.get(link)
-    soup      = BeautifulSoup(request.text,"lxml")
-    valheader = soup.find(class_='wsod_last')
+            forecast= str(soup.find(class_='wsod_twoCol clearfix'))
+            numbers =  re.findall(r"[-+]?\d*\.\d+|\d+", forecast)
 
-    act_val = getBetween(str(valheader), '"ToHundredth">', "</span")
-    name = str(soup.find(class_="wsod_fLeft wsod_narrowH1Container"))
-    #print soup.find_all('p')
+            nrecos   = numbers[0]
+            nmonths  = numbers[1]
+            exp_med  = numbers[2]
+            exp_max  = numbers[3]
+            exp_min  = numbers[4]
+            exp_perc = numbers[5]
+            act_val2 = numbers[6]
+
+            col_ini = CEND
+            if   "-" in exp_perc : col_ini = '\033[31m'
+            elif "+" in exp_perc : col_ini =  '\033[32m'
+            col_end = CEND
+
+            if float(act_val) != float(act_val2):
+                print CRED + "Error, numbers "+act_val+" and "+act_val2+" are different!" + CEND
+            recos = [0,0,0,0,0]
+
+        else:
+            print "unrecognised stock Type", stockType
+            continue
+        printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)                    
+        writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
 
 
-    forecast= str(soup.find(class_='wsod_twoCol clearfix'))
-    numbers =  re.findall(r"[-+]?\d*\.\d+|\d+", forecast)
 
-    nrecos   = numbers[0]
-    nmonths  = numbers[1]
-    exp_val  = numbers[2]
-    exp_max  = numbers[3]
-    exp_min  = numbers[4]
-    exp_perc = numbers[5]
-    act_val2 = numbers[6]
+#getStocks(stocks_wsj, "wsj")
+#getStocks(stocks_esp, "esp")
+#getStocks(stocks_cnn, "cnn")
 
-    col_ini = CEND
-    if   "-" in exp_perc : col_ini = '\033[31m'
-    elif "+" in exp_perc : col_ini =  '\033[32m'
-    col_end = CEND
-    
-    
-    if float(act_val) != float(act_val2):
-        print CRED + "Error, numbers "+act_val+" and "+act_val2+" are different!" + CEND
- 
-    printValues(stock, stocksym, act_val, exp_val, exp_max, exp_min, exp_perc, nrecos, nmonths)
-    writeCSV(csvname, stock, stocksym, act_val, exp_val, exp_max, exp_min, nrecos)
+results    = readNames("Portfolio.csv")
+stocks_csv = {}
+
+for idx, result in enumerate(results[0]):
+    result_i = result.replace("+"," ")
+    if result_i in stocks_esp.keys(): stocks_csv[result_i] = [stocks_esp[result_i][0], stocks_esp[result_i][1],"ESP"]
+    else: stocks_csv[result_i] = [results[1][idx], results[2][idx], results[3][idx]]
+
+getStocks(stocks_csv, "multiple")
+exit()
+
