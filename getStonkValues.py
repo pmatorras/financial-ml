@@ -1,4 +1,4 @@
-import requests, json, re, csv, os
+import requests, json, re, csv, os, pickle
 from bs4 import BeautifulSoup
 from datetime import datetime
 import pandas as pd
@@ -11,7 +11,7 @@ def getBetween(string, before, after):
     return string.split(before)[1].split(after)[0]
 
 def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min,recos, nrecos):
-    if "/" not in csvname: csvname =  foldir+"/"+csvname
+    if "/" in csvname: csvname =  foldir+"/"+csvname
     csvexist= os.path.exists(csvname)
     with open(csvname, 'a') as f:
         writer   = csv.writer(f, delimiter = '\t')
@@ -52,7 +52,7 @@ headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0)
 stocks_wsj = {"PROSUS N.V." : ["PRX" , "NL/XAMS/"],
               "Volkswagen"  : ["VOW3", "XE/XETR/"]}
 stocks_esp = {"LOGISTA"             : ["logista_hlgd_sa"       ,"56747"],
-              "ORYZON GENOMICS"     : ["oryzon_genomics_sa"    ,"57000"] ,
+              "ORYZON GENOMICS"     : ["oryzon_genomics_sa"    ,"57000"],
               "GRENERGY RENOVABLES" : ["grenergy_renovables_sa","56988"]}
 
 stocks_cnn = {"Alibaba" : ["BABA"], "Airbus" : ["EADSY"], "Curevac"   : ["CVAC"],
@@ -84,7 +84,7 @@ def get_symbol(stock, country):
     return symbol
 #Read names from Portfolio.csv
 def readNames(inputfile):
-    if "/" not in inputfile: inputfile =  foldir+"/"+inputfile
+    if "/"  in inputfile: inputfile =  foldir+"/"+inputfile
     with open(inputfile) as csvfile:
         reader     = csv.reader(csvfile, delimiter=',')
         names      = []
@@ -214,14 +214,27 @@ def getStocks(stocks, type_i):
 #getStocks(stocks_esp, "esp")
 #getStocks(stocks_cnn, "cnn")
 
+pickleDict = open("Portfolio_dict.pkl", "rb")
+portfolio  = pickle.load(pickleDict)
+pickleDict.close()
+
+
+'''
 results    = readNames("Portfolio.csv")
 stocks_csv = {}
+
+
+
 
 for idx, result in enumerate(results[0]):
     result_i = result.replace("+"," ")
     if result_i in stocks_esp.keys(): stocks_csv[result_i] = [stocks_esp[result_i][0], stocks_esp[result_i][1],"ESP"]
     else: stocks_csv[result_i] = [results[1][idx], results[2][idx], results[3][idx]]
 
-getStocks(stocks_csv, "multiple")
+print  portfolio, stocks_csv
 exit()
 
+exit()
+getStocks(stocks_csv, "multiple")
+'''
+getStocks(portfolio, "multiple")
