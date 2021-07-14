@@ -35,7 +35,8 @@ def get_symbol(stock, country):
         symbol = 'NOT_DO'
     else:
         symbol = str(results[0]).split("title=")[1].split(">")[1].split("<")[0]
-        print "symbol:","\033[34m"+ symbol + CEND 
+        if "VOW" in symbol: symbol += "3" 
+        print "symbol:","\033[34m"+ symbol + CEND
     return symbol
 #Read names from Portfolio.csv
 def readNames(inputfile):
