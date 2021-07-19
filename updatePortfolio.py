@@ -17,6 +17,10 @@ stocks_esp = {"LOGISTA"             : ["logista_hlgd_sa"       ,"56747"],
               "ORYZON GENOMICS"     : ["oryzon_genomics_sa"    ,"57000"] ,
               "GRENERGY RENOVABLES" : ["grenergy_renovables_sa","56988"]}
 
+linkbase   = {"cnn" : "https://money.cnn.com/quote/forecast/forecast.html?symb=",
+              "wsj" : "https://www.wsj.com/market-data/quotes/",
+              "esp" : "https://cincodias.elpais.com/mercados/empresas/"}
+
 
 def makeSoup(link):
     print link
@@ -65,6 +69,49 @@ def readNames(inputfile):
             symbols   .append(get_symbol(name, country))
     return [names,symbols, currencies, countries]
 
+
+from googlesearch import search
+
+
+jsonDict  = open("full_portfolio.json", "rb")
+portfolio = json.load(jsonDict)
+jsonDict.close()
+stocks_csv={}
+
+def getLinksGoogle(site, stock, reconm):
+    links = []
+    query = "site:cincodias.elpais.com/mercados/empresas/ "+ stock["name"]+ reconm
+    for j in search(query, tld='com', num =2, stop=2, pause =2):
+        if "recomendaciones" not in j: continue 
+        links.append(j)
+    if len(links) == 0 :
+        query = site+ stock["symbol"]+ reconm
+        for j in search(query, tld='com', num =2, stop=2, pause =2):
+            if "recomendaciones" not in j: continue 
+            links.append(j)
+    print "returning", links
+    return links
+
+for entry in portfolio:
+    stocks_csv[portfolio[entry]["symbol"]] =  [portfolio[entry]["name"], portfolio[entry]["isin"]]
+    if "ES" in portfolio[entry]["isin"]:
+        print "query", query
+        links = getLinksGoogle("site:cincodias.elpais.com/mercados/empresas/ ", portfolio[entry], " recomendaciones")
+        stocks_csv[portfolio[entry]["symbol"]].append(links[0])
+    elif "US" in portfolio[entry]["isin"]:
+        query = "site:cincodias.elpais.com/mercados/empresas/ "+ portfolio[entry]["name"]+ " recomendaciones"
+
+    
+
+print stocks_csv
+
+
+
+
+
+
+#old way
+''' 
 print foldir
 results    = readNames(foldir+"Portfolio.csv")
 
@@ -74,9 +121,8 @@ for idx, result in enumerate(results[0]):
     result_i = result.replace("+"," ")
     if result_i in stocks_esp.keys(): stocks_csv[result_i] = [stocks_esp[result_i][0], stocks_esp[result_i][1],"ESP"]
     else: stocks_csv[result_i] = [results[1][idx], results[2][idx], results[3][idx]]
+'''
 
-
-print stocks_csv
 f = open(foldir+"Portfolio_dict.pkl","wb")
 pickle.dump(stocks_csv,f)
 f.close()

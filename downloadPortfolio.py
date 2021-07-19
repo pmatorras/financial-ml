@@ -65,7 +65,7 @@ pid = [x["id"] for x in portfolio]
 r = requests.post(url, headers=header, params=payload, data=json.dumps(pid))
 additional_info = r.json()
 with open('full_portfolio.json', 'w') as f:
-    json.dump(additional_info, f, indent=4)
+    json.dump(additional_info["data"], f, indent=4)
     
 #print dict.fromkeys(
 for i in range(0,len(pid)):
