@@ -1,8 +1,11 @@
 import requests, json, re, csv, os, pickle
-from bs4 import BeautifulSoup
-from datetime import datetime
 import pandas as pd
 import requests, sys
+
+from bs4          import BeautifulSoup
+from datetime     import datetime
+from googlesearch import search
+
 now    = datetime.now()
 today  = datetime.date(now)
 foldir = os.path.dirname(sys.argv[0])
@@ -70,7 +73,6 @@ def readNames(inputfile):
     return [names,symbols, currencies, countries]
 
 
-from googlesearch import search
 
 
 jsonDict  = open("full_portfolio.json", "rb")
@@ -78,30 +80,32 @@ portfolio = json.load(jsonDict)
 jsonDict.close()
 stocks_csv={}
 
-def getLinksGoogle(site, stock, reconm):
+def getLinksGoogle(site, stock, recom):
     links = []
-    query = "site:cincodias.elpais.com/mercados/empresas/ "+ stock["name"]+ reconm
+    query = site + stock["name"].replace("SA","")+ recom
+    print "query:", query
     for j in search(query, tld='com', num =2, stop=2, pause =2):
-        if "recomendaciones" not in j: continue 
+        if recom.lstrip() not in j: continue 
         links.append(j)
     if len(links) == 0 :
-        query = site+ stock["symbol"]+ reconm
+        query = site+ stock["symbol"]+ recom
         for j in search(query, tld='com', num =2, stop=2, pause =2):
-            if "recomendaciones" not in j: continue 
+            if recom.lstrip() not in j: continue 
             links.append(j)
-    print "returning", links
     return links
 
 for entry in portfolio:
+    if "IE" in portfolio[entry]["isin"]:
+        print "ETF", entry
+        continue
+        
     stocks_csv[portfolio[entry]["symbol"]] =  [portfolio[entry]["name"], portfolio[entry]["isin"]]
     if "ES" in portfolio[entry]["isin"]:
-        print "query", query
         links = getLinksGoogle("site:cincodias.elpais.com/mercados/empresas/ ", portfolio[entry], " recomendaciones")
         stocks_csv[portfolio[entry]["symbol"]].append(links[0])
-    elif "US" in portfolio[entry]["isin"]:
-        query = "site:cincodias.elpais.com/mercados/empresas/ "+ portfolio[entry]["name"]+ " recomendaciones"
-
-    
+    else: # "US" in portfolio[entry]["isin"]:
+        links = getLinksGoogle("site:https://www.wsj.com/market-data/quotes/ ", portfolio[entry], " research-ratings")
+        stocks_csv[portfolio[entry]["symbol"]].append(links[0])
 
 print stocks_csv
 

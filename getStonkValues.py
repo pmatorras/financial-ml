@@ -73,7 +73,15 @@ def getStocks(stocks, type_i):
     for stock in stocks.keys():
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
-            if "esp"   in stocks[stock][-1].lower():
+            if "https" in stocks[stock][-1].lower():
+                link = stocks[stock][-1]
+                if "cincodias" in link: stockType = "esp"
+                elif     "cnn" in link: stockType = "cnn"
+                elif     "wsj" in link: stockType = "wsj"
+                else:
+                    print "unknown webpage"
+                    continue
+            elif "esp" in stocks[stock][-1].lower():
                 stockType = 'esp'
             elif ":"   in stocks[stock][0]:
                 stockType ='wsj'
@@ -96,7 +104,7 @@ def getStocks(stocks, type_i):
                 stocksym = stockall[0]
                 stockmar = stockall[1]
                 
-            link       = linkbase["wsj"]+stockmar+stocksym+"/research-ratings"
+            #link       = linkbase["wsj"]+stockmar+stocksym+"/research-ratings"
             soup       = makeSoup(link)
             reco_table =  soup.find(class_="cr_analystRatings cr_data module").find(class_="cr_dataTable").findAll(class_="data_data")
             recos      = []
@@ -115,7 +123,7 @@ def getStocks(stocks, type_i):
 
         elif "esp" in stockType:
             stocksym    = stock.split(' ')[0]
-            link        = linkbase["esp"]+stocks[stock][0]+"/"+stocks[stock][1]+"/recomendaciones/"
+            #link        = linkbase["esp"]+stocks[stock][0]+"/"+stocks[stock][1]+"/recomendaciones/"
             soup        = makeSoup(link)
             dataset     = soup.text.split("var barChartData =")[1].split('};')[0]
             recommend   =  soup.text.split("Tendencia de las recomendaciones")[1].split("*La")[0]
@@ -132,11 +140,11 @@ def getStocks(stocks, type_i):
         elif "cnn" in stockType:
             stocksym  = stocks[stock][0]
             
-            link      = linkbase["cnn"]+stocksym
+            #link      = linkbase["cnn"]+stocksym
             request   = requests.get(link)
             soup      = BeautifulSoup(request.text,"lxml")
             valheader = soup.find(class_='wsod_last')
-            print link
+            print link, valheader
             act_val = getBetween(str(valheader), '"ToHundredth">', "</span")
             name = str(soup.find(class_="wsod_fLeft wsod_narrowH1Container"))
             #print soup.find_all('p')
@@ -169,6 +177,8 @@ def getStocks(stocks, type_i):
         writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
 
 
+
+   
 pickleDict = open("Portfolio_dict.pkl", "rb")
 portfolio  = pickle.load(pickleDict)
 pickleDict.close()
