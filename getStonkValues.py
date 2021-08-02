@@ -11,7 +11,7 @@ CRED    = '\033[91m'
 CEND    = '\033[0m'
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
 csvname = 'stocks.txt'
-
+if '/' in foldir: foldir+='/'
 #Stock dictionaries
 stocks_wsj = {"PROSUS N.V." : ["PRX" , "NL/XAMS/"],
               "Volkswagen"  : ["VOW3", "XE/XETR/"]}
@@ -33,7 +33,9 @@ def getBetween(string, before, after):
 def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min,recos, nrecos):
     if "/" in csvname: csvname =  foldir+"/"+csvname
     csvexist= os.path.exists(csvname)
-    with open(csvname, 'a') as f:
+    if csvexist is False: w_type = 'w'
+    else: w_type = 'a'
+    with open(csvname, w_type) as f:
         writer   = csv.writer(f, delimiter = '\t')
         titlerow = stock+"\t["+stocksym+"]\t" 
         if csvexist is False : writer.writerow(['stock','abrv' , 'variable', str(today)])
@@ -70,42 +72,30 @@ def makeSoup(link):
 
 
 def getStocks(stocks, type_i):
-    for stock in stocks.keys():
+    for stocksym in stocks.keys():
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
-            if "https" in stocks[stock][-1].lower():
-                link = stocks[stock][-1]
+            if "https" in stocks[stocksym][-1].lower():
+                link = stocks[stocksym][-1]
                 if "cincodias" in link: stockType = "esp"
                 elif     "cnn" in link: stockType = "cnn"
                 elif     "wsj" in link: stockType = "wsj"
                 else:
                     print "unknown webpage"
                     continue
-            elif "esp" in stocks[stock][-1].lower():
+            elif "esp" in stocks[stocksym][-1].lower():
                 stockType = 'esp'
-            elif ":"   in stocks[stock][0]:
+            elif ":"   in stocks[stocksym][0]:
                 stockType ='wsj'
             else:
                 stockType = 'cnn'
         nmonths = '12'
-        print stock, stocks[stock], stockType
+        
+        stock = stocks[stocksym][0]
+        print stocksym, stocks[stocksym], stock
+        soup       = makeSoup(link)
+
         if "wsj" in stockType:
-            stockall = stocks[stock]
-            if ":" in stockall[0]:
-                print "and here"
-                stocksym = stockall[0].split(":")[1]
-                if stocksym == "AIRA" : stocksym = "AIR"
-                print "stockall", stockall
-                if "DE" in stockall[0]:
-                    stockmar = "XE/XETR/"
-                elif "NL" in stockall[0]:
-                    stockmar = "NL/XAMS/"
-            else:
-                stocksym = stockall[0]
-                stockmar = stockall[1]
-                
-            #link       = linkbase["wsj"]+stockmar+stocksym+"/research-ratings"
-            soup       = makeSoup(link)
             reco_table =  soup.find(class_="cr_analystRatings cr_data module").find(class_="cr_dataTable").findAll(class_="data_data")
             recos      = []
             for i in range(2,len(reco_table),3):
@@ -122,9 +112,6 @@ def getStocks(stocks, type_i):
             exp_perc = round(100*(float(exp_med)-float(act_val))/float(act_val),2)
 
         elif "esp" in stockType:
-            stocksym    = stock.split(' ')[0]
-            #link        = linkbase["esp"]+stocks[stock][0]+"/"+stocks[stock][1]+"/recomendaciones/"
-            soup        = makeSoup(link)
             dataset     = soup.text.split("var barChartData =")[1].split('};')[0]
             recommend   =  soup.text.split("Tendencia de las recomendaciones")[1].split("*La")[0]
             all_act_val = getBetween(dataset.split('Precio real')[1].split('data')[1], '[', ']')
@@ -138,28 +125,18 @@ def getStocks(stocks, type_i):
             exp_perc    = round(100*(float(exp_med)-float(act_val))/float(act_val),2)
 
         elif "cnn" in stockType:
-            stocksym  = stocks[stock][0]
-            
-            #link      = linkbase["cnn"]+stocksym
-            request   = requests.get(link)
-            soup      = BeautifulSoup(request.text,"lxml")
             valheader = soup.find(class_='wsod_last')
-            print link, valheader
-            act_val = getBetween(str(valheader), '"ToHundredth">', "</span")
-            name = str(soup.find(class_="wsod_fLeft wsod_narrowH1Container"))
-            #print soup.find_all('p')
-
-
-            forecast= str(soup.find(class_='wsod_twoCol clearfix'))
-            numbers =  re.findall(r"[-+]?\d*\.\d+|\d+", forecast)
-
-            nrecos   = numbers[0]
-            nmonths  = numbers[1]
-            exp_med  = numbers[2]
-            exp_max  = numbers[3]
-            exp_min  = numbers[4]
-            exp_perc = numbers[5]
-            act_val2 = numbers[6]
+            act_val   = getBetween(str(valheader), '"ToHundredth">', "</span")
+            name      = str(soup.find(class_="wsod_fLeft wsod_narrowH1Container"))
+            forecast  = str(soup.find(class_='wsod_twoCol clearfix'))
+            numbers   =  re.findall(r"[-+]?\d*\.\d+|\d+", forecast)
+            nrecos    = numbers[0]
+            nmonths   = numbers[1]
+            exp_med   = numbers[2]
+            exp_max   = numbers[3]
+            exp_min   = numbers[4]
+            exp_perc  = numbers[5]
+            act_val2  = numbers[6]
 
             col_ini = CEND
             if   "-" in exp_perc : col_ini = '\033[31m'
@@ -173,13 +150,15 @@ def getStocks(stocks, type_i):
         else:
             print "unrecognised stock Type", stockType
             continue
-        printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)                    
-        writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
+        print "STOCK", stock, stocksym
+        printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
 
+        writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
+        
 
 
    
-pickleDict = open("Portfolio_dict.pkl", "rb")
+pickleDict = open(foldir+"Portfolio_dict.pkl", "rb")
 portfolio  = pickle.load(pickleDict)
 pickleDict.close()
 os.system('rm '+csvname)

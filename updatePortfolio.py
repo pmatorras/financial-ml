@@ -94,11 +94,12 @@ def getLinksGoogle(site, stock, recom):
             links.append(j)
     return links
 
+
 for entry in portfolio:
     if "IE" in portfolio[entry]["isin"]:
         print "ETF", entry
         continue
-        
+
     stocks_csv[portfolio[entry]["symbol"]] =  [portfolio[entry]["name"], portfolio[entry]["isin"]]
     if "ES" in portfolio[entry]["isin"]:
         links = getLinksGoogle("site:cincodias.elpais.com/mercados/empresas/ ", portfolio[entry], " recomendaciones")

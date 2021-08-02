@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
-import os, sys
+import os, sys, json
 
 
 foldir   = os.path.dirname(sys.argv[0])
@@ -10,6 +10,16 @@ stocks   = pd.read_csv("stocks.txt", sep="\t")
 now      = datetime.now()
 today    = str(datetime.date(now))
 stocknms = []
+
+jsonDict  = open("full_portfolio.json", "rb")
+portfolio = json.load(jsonDict)
+
+print stocks['stock']
+#print "portfolio", portfolio[0]
+for key in portfolio:
+    print key, portfolio[key]['symbol']
+
+exit()
 
 if "/"  in foldir: foldir += "/" 
 plotdir  = foldir+"Plots/"

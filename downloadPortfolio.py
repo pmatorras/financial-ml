@@ -56,6 +56,8 @@ for position in data["portfolio"]["value"]:
     temp_portfolio.append(to_append)
 portfolio = list(filter(lambda x: x["positionType"] == "PRODUCT" and x["size"]>0 , temp_portfolio))
 
+#print portfolio
+#exit()
 
 
 ## get product info
@@ -64,6 +66,9 @@ payload = {'intAccount': intAccount, 'sessionId': sessionID}
 pid = [x["id"] for x in portfolio]
 r = requests.post(url, headers=header, params=payload, data=json.dumps(pid))
 additional_info = r.json()
+
+
+#additional_info.update(portfolio)
 with open('full_portfolio.json', 'w') as f:
     json.dump(additional_info["data"], f, indent=4)
     
