@@ -4,6 +4,36 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os, sys, json
 
+def makerecoplots(sell, underw, hold, overw, buy):
+    colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
+    reconms = ["sell", "underweight", "hold", "overwight", "buy" ]
+    order   = [4,3,2,1,0]
+    plt.bar(stocknms,sell  , color=colrec[0], label=reconms[0])
+    plt.bar(stocknms,underw, color=colrec[1], label=reconms[1], bottom=sell)
+    plt.bar(stocknms,hold  , color=colrec[2], label=reconms[2], bottom=(sell+underw))
+    plt.bar(stocknms,overw , color=colrec[3], label=reconms[3], bottom=sell+underw+hold)
+    plt.bar(stocknms,buy   , color=colrec[4], label=reconms[4], bottom=sell+underw+hold+overw)
+
+    plt.title("Expert recommendations")
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+    plt.xlabel("company")
+
+#plot difference
+def diff_plots(act_val, exp_val,typedif):
+    plt.gcf().subplots_adjust(bottom=0.15)
+    plt.scatter(stocknms, act_val, marker="_",label="Stock value at "+today, color=colors)
+    if "abs" in typedif.lower() : gain = "Prize [USD]"
+    else                        : gain = "Gain/loss [%]"
+    plt.errorbar(stocknms, exp_val, yerr =exp_ran, fmt='.', color='blue', label="Exp. "+gain)
+    plt.ylabel(gain)
+    plt.xlabel("Stock name")
+    plt.title(typedif+" expected gain/loss")
+    plt.legend()
+    plt.tick_params(axis='x', rotation=45)
+    plt.savefig(plotdir+typedif+"_difference.pdf")
+    plt.clf()
+
 
 foldir   = os.path.dirname(sys.argv[0])
 stocks   = pd.read_csv("stocks.txt", sep="\t")
@@ -50,34 +80,15 @@ hold   = stocks[stocks["variable"]=="hold"   ][today].reset_index(drop=True)
 underw = stocks[stocks["variable"]=="underw" ][today].reset_index(drop=True)
 sell   = stocks[stocks["variable"]=="sell"   ][today].reset_index(drop=True)
 nrecom = stocks[stocks["variable"]=="n_recom"][today].reset_index(drop=True)
-#allrec = buy+overw+hold+underw+sell
 
-#print len(buy), len(overw), len(hold), len(underw), len(sell)
-allrec  = np.vstack([buy,overw])#, hold, underw, sell])#,hold,underw,sell])
-colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
-reconms = ["sell", "underweight", "hold", "overwight", "buy" ]
-order   = [4,3,2,1,0]
 
-def makerecoplots(sell, underw, hold, overw, buy):
-    plt.bar(stocknms,sell  , color=colrec[0], label=reconms[0])
-    plt.bar(stocknms,underw, color=colrec[1], label=reconms[1], bottom=sell)
-    plt.bar(stocknms,hold  , color=colrec[2], label=reconms[2], bottom=(sell+underw))
-    plt.bar(stocknms,overw , color=colrec[3], label=reconms[3], bottom=sell+underw+hold)
-    plt.bar(stocknms,buy   , color=colrec[4], label=reconms[4], bottom=sell+underw+hold+overw)
-
-    plt.title("Expert recommendations")
-    handles, labels = plt.gca().get_legend_handles_labels()
-    plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
-    plt.xlabel("company")
 makerecoplots(sell, underw, hold, overw, buy)
 plt.ylabel("n recommendations")
-
 plt.savefig(plotdir+"tot_recommendations.png")
 plt.clf()
 
 makerecoplots(100*sell/nrecom, 100* underw/nrecom, 100*hold/nrecom, 100*overw/nrecom, 100*buy/nrecom)
 plt.ylabel("recommendations [%]")
-
 plt.savefig(plotdir+"rel_recommendations.png")
 plt.clf()    
     
@@ -93,26 +104,8 @@ for dif in difference[today]:
         colors.append('r')
         longcolors.append([1,0,0,1])
 
-#absolute difference
-plt.gcf().subplots_adjust(bottom=0.15)
-plt.scatter(stocknms, act_val, marker="_",label="Stock value at "+today, color=colors)
-plt.errorbar(stocknms, exp_val, yerr =exp_ran, fmt='.', color='blue', label="expected value")
-plt.ylabel("Prize [USD]")
-plt.xlabel("Stock name")
-plt.title("Stock prize vs forecast")
-plt.legend()
-plt.tick_params(axis='x', rotation=45)
-plt.savefig(plotdir+"absolute_difference.pdf")
+        
 
-plt.clf()
+diff_plots(act_val   , exp_val   , "absolute")
+diff_plots(act_relval, exp_relval, "relative")
 
-#Relative difference
-plt.scatter(stocknms, act_relval, marker="_",label="Stock value at "+today, color=colors)
-plt.errorbar(stocknms, exp_relval, yerr =exp_relran, color='blue', label="expected value", linestyle="none", marker ="s")
-
-plt.ylabel("Exp. gain [%]")
-plt.xlabel("Stock name")
-plt.title("Relative expected gain/loss")
-plt.legend()
-plt.tick_params(axis='x', rotation=45)
-plt.savefig(plotdir+"relative_difference.pdf")
