@@ -1,33 +1,34 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 import os, sys, json
 
 
 foldir   = os.path.dirname(sys.argv[0])
 stocks   = pd.read_csv("stocks.txt", sep="\t")
 now      = datetime.now()
-today    = str(datetime.date(now))
+today    = str(datetime.date(now))#-timedelta(days=1)) 
 stocknms = []
 
 jsonDict  = open("full_portfolio.json", "rb")
 portfolio = json.load(jsonDict)
 
-print stocks['stock']
+#print stocks['stock']
 #print "portfolio", portfolio[0]
-for key in portfolio:
-    print key, portfolio[key]['symbol']
+#for key in portfolio:
+#    print key, portfolio[key]
 
-exit()
+#exit()
 
+#print stocks.keys()
 if "/"  in foldir: foldir += "/" 
 plotdir  = foldir+"Plots/"
 os.system("mkdir -p " + plotdir)
-for stock in  stocks["abrv"]:
+for stock in  stocks["symb"]:
     if stock not in stocknms: stocknms.append(stock)
 
-
+#get abs/rel difference info
 act_val    = stocks[stocks["variable"]=="act_val"][today]
 exp_val    = stocks[stocks["variable"]=="exp_val"][today]
 exp_max    = stocks[stocks["variable"]=="exp_max"][today]
@@ -42,7 +43,45 @@ exp_minreldif = 100*exp_mindif.reset_index(drop=True)/act_val.reset_index(drop=T
 exp_maxreldif = 100*exp_maxdif.reset_index(drop=True)/act_val.reset_index(drop=True)
 exp_relran    = np.array(list(zip(exp_minreldif, exp_maxreldif))).T
 
-#Get colours
+#Get sell info
+buy    = stocks[stocks["variable"]=="buy"    ][today].reset_index(drop=True)
+overw  = stocks[stocks["variable"]=="overw"  ][today].reset_index(drop=True)
+hold   = stocks[stocks["variable"]=="hold"   ][today].reset_index(drop=True)
+underw = stocks[stocks["variable"]=="underw" ][today].reset_index(drop=True)
+sell   = stocks[stocks["variable"]=="sell"   ][today].reset_index(drop=True)
+nrecom = stocks[stocks["variable"]=="n_recom"][today].reset_index(drop=True)
+#allrec = buy+overw+hold+underw+sell
+
+#print len(buy), len(overw), len(hold), len(underw), len(sell)
+allrec  = np.vstack([buy,overw])#, hold, underw, sell])#,hold,underw,sell])
+colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
+reconms = ["sell", "underweight", "hold", "overwight", "buy" ]
+order   = [4,3,2,1,0]
+
+def makerecoplots(sell, underw, hold, overw, buy):
+    plt.bar(stocknms,sell  , color=colrec[0], label=reconms[0])
+    plt.bar(stocknms,underw, color=colrec[1], label=reconms[1], bottom=sell)
+    plt.bar(stocknms,hold  , color=colrec[2], label=reconms[2], bottom=(sell+underw))
+    plt.bar(stocknms,overw , color=colrec[3], label=reconms[3], bottom=sell+underw+hold)
+    plt.bar(stocknms,buy   , color=colrec[4], label=reconms[4], bottom=sell+underw+hold+overw)
+
+    plt.title("Expert recommendations")
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+    plt.xlabel("company")
+makerecoplots(sell, underw, hold, overw, buy)
+plt.ylabel("n recommendations")
+
+plt.savefig(plotdir+"tot_recommendations.png")
+plt.clf()
+
+makerecoplots(100*sell/nrecom, 100* underw/nrecom, 100*hold/nrecom, 100*overw/nrecom, 100*buy/nrecom)
+plt.ylabel("recommendations [%]")
+
+plt.savefig(plotdir+"rel_recommendations.png")
+plt.clf()    
+    
+
 difference = act_val.reset_index() -exp_val.reset_index()
 colors     = []
 longcolors = []

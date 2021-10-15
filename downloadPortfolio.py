@@ -52,13 +52,16 @@ for position in data["portfolio"]["value"]:
     to_append = {}
     for position_data in position["value"]:
         if "value" in position_data:
-            to_append[position_data["name"]] = position_data["value"]
+            to_append[position_data["name"
+            ]] = position_data["value"]
     temp_portfolio.append(to_append)
 portfolio = list(filter(lambda x: x["positionType"] == "PRODUCT" and x["size"]>0 , temp_portfolio))
+BEP = {}
+for fund in portfolio:
+    print fund["id"],fund["breakEvenPrice"]
+    BEP[fund["id"]] = fund["breakEvenPrice"]
 
-#print portfolio
-#exit()
-
+print BEP
 
 ## get product info
 url = "https://trader.degiro.nl/product_search/secure/v5/products/info"
@@ -67,12 +70,21 @@ pid = [x["id"] for x in portfolio]
 r = requests.post(url, headers=header, params=payload, data=json.dumps(pid))
 additional_info = r.json()
 
+print "rdict", r
 
+json_object = json.dumps(BEP, indent = 4)  
+#BEP_JSON = json.dump(BEP, indent=4)
+#print "portfolio", portfolio
+
+for info in additional_info["data"]:
+    this_info =1# additional_info["data"][info].update(json_object[info])
 #additional_info.update(portfolio)
 with open('full_portfolio.json', 'w') as f:
     json.dump(additional_info["data"], f, indent=4)
     
+
 #print dict.fromkeys(
 for i in range(0,len(pid)):
     this_stock = additional_info["data"][pid[i]]
-    print this_stock["name"], this_stock["symbol"]
+    print this_stock["name"], this_stock#
+    ["symbol"]

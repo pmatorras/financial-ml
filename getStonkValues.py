@@ -38,7 +38,7 @@ def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min,recos, 
     with open(csvname, w_type) as f:
         writer   = csv.writer(f, delimiter = '\t')
         titlerow = stock+"\t["+stocksym+"]\t" 
-        if csvexist is False : writer.writerow(['stock','abrv' , 'variable', str(today)])
+        if csvexist is False : writer.writerow(['stock','symb' , 'variable', str(today)])
         writer.writerow([stock, stocksym, "act_val", act_val  ])
         writer.writerow([stock, stocksym, "exp_val", exp_val  ])
         writer.writerow([stock, stocksym, "exp_max", exp_max  ])
