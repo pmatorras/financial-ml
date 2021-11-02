@@ -108,25 +108,8 @@ for entry in portfolio:
         links = getLinksGoogle("site:https://www.wsj.com/market-data/quotes/ ", portfolio[entry], " research-ratings")
         stocks_csv[portfolio[entry]["symbol"]].append(links[0])
 
-print stocks_csv
 
 
-
-
-
-
-#old way
-''' 
-print foldir
-results    = readNames(foldir+"Portfolio.csv")
-
-stocks_csv = {}
-
-for idx, result in enumerate(results[0]):
-    result_i = result.replace("+"," ")
-    if result_i in stocks_esp.keys(): stocks_csv[result_i] = [stocks_esp[result_i][0], stocks_esp[result_i][1],"ESP"]
-    else: stocks_csv[result_i] = [results[1][idx], results[2][idx], results[3][idx]]
-'''
 
 f = open(foldir+"Portfolio_dict.pkl","wb")
 pickle.dump(stocks_csv,f)
