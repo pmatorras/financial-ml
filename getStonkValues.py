@@ -66,8 +66,7 @@ def makeSoup(link):
 
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
-        print stocksym, jportfolio[symb_isin[stocksym]]
-        continue
+        jport_i = jportfolio[symb_isin[stocksym]]
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
             if "https" in stocks[stocksym][-1].lower():
@@ -146,6 +145,13 @@ def getStocks(stocks, type_i):
             print "unrecognised stock Type", stockType
             continue
         print "STOCK", stock, stocksym
+        jport_i["act_val" ] = act_val
+        jport_i["exp_med" ] = exp_med
+        jport_i["exp_max" ] = exp_max
+        jport_i["exp_min" ] = exp_min
+        jport_i["exp_perc"] = exp_perc
+        jport_i["nrecos"  ] = nrecos
+        jport_i["nmonths" ] = nmonths
         printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
 
         writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
