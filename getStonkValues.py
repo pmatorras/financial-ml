@@ -12,6 +12,13 @@ CEND    = '\033[0m'
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
 csvname = 'stocks.txt'
 if '/' in foldir: foldir+='/'
+jsonDict   = open("full_portfolio.json", "rb")
+jportfolio = json.load(jsonDict)
+symb_isin  = {}
+for entry in jportfolio:
+    symb_isin[jportfolio[entry]["symbol"]]=entry
+
+
 
 def getBetween(string, before, after):
     return string.split(before)[1].split(after)[0]
@@ -59,6 +66,8 @@ def makeSoup(link):
 
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
+        print stocksym, jportfolio[symb_isin[stocksym]]
+        continue
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
             if "https" in stocks[stocksym][-1].lower():
@@ -146,6 +155,8 @@ def getStocks(stocks, type_i):
    
 pickleDict = open(foldir+"Portfolio_dict.pkl", "rb")
 portfolio  = pickle.load(pickleDict)
+
+
 pickleDict.close()
 os.system('rm '+csvname)
 
