@@ -12,20 +12,6 @@ CEND    = '\033[0m'
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
 csvname = 'stocks.txt'
 if '/' in foldir: foldir+='/'
-#Stock dictionaries
-stocks_wsj = {"PROSUS N.V." : ["PRX" , "NL/XAMS/"],
-              "Volkswagen"  : ["VOW3", "XE/XETR/"]}
-stocks_esp = {"LOGISTA"             : ["logista_hlgd_sa"       ,"56747"],
-              "ORYZON GENOMICS"     : ["oryzon_genomics_sa"    ,"57000"],
-              "GRENERGY RENOVABLES" : ["grenergy_renovables_sa","56988"]}
-
-stocks_cnn = {"Alibaba" : ["BABA"], "Airbus" : ["EADSY"], "Curevac"   : ["CVAC"],
-              "Arcelor" : ["MT"  ], "TSMC  " : ["TSM"  ], "Dr Horton" : ["DHI" ],
-              "Total"   : ["TOT"]}
-
-linkbase   = {"cnn" : "https://money.cnn.com/quote/forecast/forecast.html?symb=",
-              "wsj" : "https://www.wsj.com/market-data/quotes/",
-              "esp" : "https://cincodias.elpais.com/mercados/empresas/"}
 
 def getBetween(string, before, after):
     return string.split(before)[1].split(after)[0]
