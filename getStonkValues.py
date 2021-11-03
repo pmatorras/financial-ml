@@ -10,41 +10,17 @@ foldir  = os.path.dirname(sys.argv[0])
 CRED    = '\033[91m'
 CEND    = '\033[0m'
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
-csvname = 'stocks.txt'
 if '/' in foldir: foldir+='/'
-jsonDict   = open("full_portfolio.json", "rb")
-jportfolio = json.load(jsonDict)
+jsonFile   = open("full_portfolio.json", "rb")
+jsonStocks = json.load(jsonFile)
 symb_isin  = {}
-for entry in jportfolio:
-    symb_isin[jportfolio[entry]["symbol"]]=entry
+for entry in jsonStocks:
+    symb_isin[jsonStocks[entry]["symbol"]]=entry
 
 
 
 def getBetween(string, before, after):
     return string.split(before)[1].split(after)[0]
-
-def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min,recos, nrecos):
-    if "/" in csvname: csvname =  foldir+"/"+csvname
-    csvexist= os.path.exists(csvname)
-    if csvexist is False: w_type = 'w'
-    else: w_type = 'a'
-    with open(csvname, w_type) as f:
-        writer   = csv.writer(f, delimiter = '\t')
-        titlerow = stock+"\t["+stocksym+"]\t" 
-        if csvexist is False : writer.writerow(['stock','symb' , 'variable', str(today)])
-        writer.writerow([stock, stocksym, "act_val", act_val  ])
-        writer.writerow([stock, stocksym, "exp_val", exp_val  ])
-        writer.writerow([stock, stocksym, "exp_max", exp_max  ])
-        writer.writerow([stock, stocksym, "exp_min", exp_min  ])
-        writer.writerow([stock, stocksym, "buy"    , recos[0] ])
-        writer.writerow([stock, stocksym, "overw"  , recos[1] ])
-        writer.writerow([stock, stocksym, "hold"   , recos[2] ])
-        writer.writerow([stock, stocksym, "underw" , recos[3] ])
-        writer.writerow([stock, stocksym, "sell"   , recos[4] ])
-        writer.writerow([stock, stocksym, "n_recom", nrecos   ])
-        writer.writerow("")
-
-
 
 def printValues(stock, stocksym, BEP, act_val, exp_val, exp_max, exp_min,  exp_perc, nrecos, nmonths):
     col_ini = CEND
@@ -66,8 +42,8 @@ def makeSoup(link):
 
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
-        jport_i = jportfolio[symb_isin[stocksym]]
-        BEP     = str(jport_i["BEP"])
+        json_i = jsonStocks[symb_isin[stocksym]]
+        BEP     = str(json_i["BEP"])
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
             if "https" in stocks[stocksym][-1].lower():
@@ -146,16 +122,16 @@ def getStocks(stocks, type_i):
             print "unrecognised stock Type", stockType
             continue
         print "STOCK", stock, stocksym
-        jport_i["act_val" ] = act_val
-        jport_i["exp_med" ] = exp_med
-        jport_i["exp_max" ] = exp_max
-        jport_i["exp_min" ] = exp_min
-        jport_i["exp_perc"] = exp_perc
-        jport_i["nrecos"  ] = nrecos
-        jport_i["nmonths" ] = nmonths
+        json_i["act_val" ] = float(act_val)
+        json_i["exp_med" ] = float(exp_med)
+        json_i["exp_max" ] = float(exp_max)
+        json_i["exp_min" ] = float(exp_min)
+        json_i["exp_perc"] = float(exp_perc)
+        json_i["nrecos"  ] = float(nrecos)
+        json_i["nmonths" ] = float(nmonths)
+        json_i["recos"   ] = recos
+        
         printValues(stock, stocksym, BEP, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
-
-        writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
         
 
 
@@ -165,9 +141,8 @@ portfolio  = pickle.load(pickleDict)
 
 
 pickleDict.close()
-os.system('rm '+csvname)
 
 getStocks(portfolio, "multiple")
 #save to json                                              
 with open('act_info.json', 'w') as f:
-    json.dump(jportfolio, f, indent=4)
+    json.dump(jsonStocks, f, indent=4)
