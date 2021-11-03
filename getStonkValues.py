@@ -46,14 +46,14 @@ def writeCSV(csvname,stock, stocksym, act_val, exp_val, exp_max, exp_min,recos, 
 
 
 
-def printValues(stock, stocksym, act_val, exp_val, exp_max, exp_min,  exp_perc, nrecos, nmonths):
+def printValues(stock, stocksym, BEP, act_val, exp_val, exp_max, exp_min,  exp_perc, nrecos, nmonths):
     col_ini = CEND
     if   "-" in str(exp_perc) or exp_perc<0 : col_ini = '\033[31m'
     elif "+" in str(exp_perc) or exp_perc>0 : col_ini =  '\033[32m'
     if float(exp_perc)>0: exp_perc = "+"+str(float(exp_perc))
     col_end = CEND
     print stock, "["+stocksym+"]"
-    print "current value:", '\033[34m'+act_val+col_end
+    print "current value:", '\033[34m'+act_val+col_end, "\t with BEP:,", '\033[34m'+BEP+col_end
     print "expected value in" ,nmonths, "months:", exp_val, "all", nrecos, "analysis fall within ["+exp_max+","+exp_min+"]"
     print "Current average gain:", col_ini+str(exp_perc)+col_end
     print ""
@@ -67,6 +67,7 @@ def makeSoup(link):
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
         jport_i = jportfolio[symb_isin[stocksym]]
+        BEP     = str(jport_i["BEP"])
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
             if "https" in stocks[stocksym][-1].lower():
@@ -84,7 +85,7 @@ def getStocks(stocks, type_i):
             else:
                 stockType = 'cnn'
         nmonths = '12'
-        
+        print "link", link
         stock = stocks[stocksym][0]
         print stocksym, stocks[stocksym], stock
         soup       = makeSoup(link)
@@ -152,7 +153,7 @@ def getStocks(stocks, type_i):
         jport_i["exp_perc"] = exp_perc
         jport_i["nrecos"  ] = nrecos
         jport_i["nmonths" ] = nmonths
-        printValues(stock, stocksym, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
+        printValues(stock, stocksym, BEP, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
 
         writeCSV(csvname, stock, stocksym, act_val, exp_med, exp_max, exp_min, recos, nrecos)
         
@@ -167,3 +168,6 @@ pickleDict.close()
 os.system('rm '+csvname)
 
 getStocks(portfolio, "multiple")
+#save to json                                              
+with open('act_info.json', 'w') as f:
+    json.dump(jportfolio, f, indent=4)

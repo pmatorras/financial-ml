@@ -30,70 +30,33 @@ def makeSoup(link):
     request   = requests.get(link, headers=headers)
     return  BeautifulSoup(request.text,"lxml")
 
-#Find symbol similar to name
-def get_symbol(stock, country):
-    url = "https://www.marketwatch.com/tools/quotes/lookup.asp?siteID=mktw&Lookup="+stock+"&Country="+country+"&Type=all"#Stock"
-    print stock, country
-    print url
-    soup    = makeSoup(url)
-    results = soup.findAll(class_="results")
-    if stock[:3] not in str(results[0]).split("title=")[1].split(">")[0].upper():
-        print CRED + "Stock: " + stock + " different from " + str(results[0]).split("title=")[1].split(">")[0] + CEND
-        symbol = 'NOT_DO'
-    else:
-        symbol = str(results[0]).split("title=")[1].split(">")[1].split("<")[0]
-        if "VOW" in symbol: symbol += "3" 
-        print "symbol:","\033[34m"+ symbol + CEND
-    return symbol
-#Read names from Portfolio.csv
-def readNames(inputfile):
-    print inputfile
-    with open(inputfile) as csvfile:
-        reader     = csv.reader(csvfile, delimiter=',')
-        names      = []
-        countries  = []
-        currencies = []
-        symbols    = []
-        for row in reader:
-            if "cash" in row[0].lower() or "Producto" in row[0] or "ISHARES" in row[0] : continue
-            long_name = row[0].split(' ')
-            name      = row[0]
-            country   = row[1][:2]
-            currency  = row[4][:3]
-            if "NL" in country and "prosus" not in name.lower():
-                if "USD" in currency: country = "US"
-                else: country = "DE"
-            if long_name[len(long_name)-1]  == "COMM": name = name.replace('COMM','')
-            name = name.replace("REGISTERED","").replace("NY","").replace("S.A.","").replace("INC","").replace(" ","+").replace("GROUP","").replace("HOLDING","").strip()
-            if "TOTAL"  in name: name +="Energies"
-            names     .append(name)
-            countries .append(country)
-            currencies.append(currency)
-            symbols   .append(get_symbol(name, country))
-    return [names,symbols, currencies, countries]
-
-
 
 
 jsonDict  = open("full_portfolio.json", "rb")
 portfolio = json.load(jsonDict)
 jsonDict.close()
 stocks_csv={}
-
-def getLinksGoogle(site, stock, recom):
-    links = []
-    query = site + stock["name"].replace("SA","")+ recom
-    print "query:", query
+def loopqueries(query,recom,links):
     for j in search(query, tld='com', num =2, stop=2, pause =2):
         if recom.lstrip() not in j: continue 
         links.append(j)
-    if len(links) == 0 :
-        query = site+ stock["symbol"]+ recom
-        for j in search(query, tld='com', num =2, stop=2, pause =2):
-            if recom.lstrip() not in j: continue 
-            links.append(j)
-    return links
 
+def getLinksGoogle(site, stock, recom):
+    links = []
+    query = site+ stock["symbol"]+" "+stock["name"].replace("SA","")+" "+recom
+    print "Stock", stock["symbol"], "\t query", query
+
+    loopqueries(query,recom,links)
+
+    if len(links) == 0 :
+        query = site + stock["symbol"].replace("SA","")+ recom 
+        loopqueries(query,recom, links)
+    if len(links) == 0 :
+        query = site + stock["name"].replace("SA","")+ recom 
+        loopqueries(query,recom, links)
+    print "links", links[0]
+    return links
+    
 
 for entry in portfolio:
     if "IE" in portfolio[entry]["isin"]:
@@ -101,13 +64,14 @@ for entry in portfolio:
         continue
 
     stocks_csv[portfolio[entry]["symbol"]] =  [portfolio[entry]["name"], portfolio[entry]["isin"]]
+    
     if "ES" in portfolio[entry]["isin"]:
         links = getLinksGoogle("site:cincodias.elpais.com/mercados/empresas/ ", portfolio[entry], " recomendaciones")
         stocks_csv[portfolio[entry]["symbol"]].append(links[0])
     else: # "US" in portfolio[entry]["isin"]:
         links = getLinksGoogle("site:https://www.wsj.com/market-data/quotes/ ", portfolio[entry], " research-ratings")
         stocks_csv[portfolio[entry]["symbol"]].append(links[0])
-
+        
 
 
 

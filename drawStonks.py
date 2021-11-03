@@ -3,6 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os, sys, json
+foldir   = os.path.dirname(sys.argv[0])
+if "/"  in foldir: foldir += "/" 
+plotdir  = foldir+"Plots/"
+os.system("mkdir -p " + plotdir)
 
 def makerecoplots(sell, underw, hold, overw, buy):
     colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
@@ -20,7 +24,7 @@ def makerecoplots(sell, underw, hold, overw, buy):
     plt.xlabel("company")
 
 #plot difference
-def diff_plots(act_val, exp_val,typedif):
+def diff_plots(act_val, exp_val,stocknms,typedif):
     plt.gcf().subplots_adjust(bottom=0.15)
     plt.scatter(stocknms, act_val, marker="_",label="Stock value at "+today, color=colors)
     if "abs" in typedif.lower() : gain = "Prize [USD]"
@@ -35,43 +39,52 @@ def diff_plots(act_val, exp_val,typedif):
     plt.clf()
 
 
-foldir   = os.path.dirname(sys.argv[0])
 stocks   = pd.read_csv("stocks.txt", sep="\t")
 now      = datetime.now()
 today    = str(datetime.date(now))#-timedelta(days=1)) 
 stocknms = []
 
-jsonDict  = open("full_portfolio.json", "rb")
+jsonDict  = open("act_info.json", "rb")
 portfolio = json.load(jsonDict)
 
-#print stocks['stock']
-#print "portfolio", portfolio[0]
-#for key in portfolio:
-#    print key, portfolio[key]
+#print (portfolio), (stocks)
+stocknm = np.array([])
+act_val = np.array([])
+exp_val = np.array([])
+exp_max = np.array([])
+exp_min = np.array([])
+for isin in portfolio:
+    if "ETF" in portfolio[isin]["productType"]: continue 
+    stocknm = np.append(stocknm,portfolio[isin][u'symbol'])
+    act_val = np.append(act_val,float(portfolio[isin][u'act_val']))
+    exp_val = np.append(exp_val,float(portfolio[isin][u'exp_med']))
+    exp_max = np.append(exp_max,float(portfolio[isin][u'exp_max']))
+    exp_min = np.append(exp_min,float(portfolio[isin][u'exp_min']))
 
-#exit()
+exp_mindif    = exp_val-exp_min
+exp_maxdif    = exp_max-exp_val
+difference    = act_val-exp_val
+act_relval    = -100 + 100*act_val/act_val
+exp_relval    = -100 + 100*(exp_val/act_val)
+exp_minreldif = 100*exp_mindif/act_val
+exp_maxreldif = 100*exp_maxdif/act_val
+exp_relran    = np.array(list(zip(exp_minreldif, exp_maxreldif))).T
 
-#print stocks.keys()
-if "/"  in foldir: foldir += "/" 
-plotdir  = foldir+"Plots/"
-os.system("mkdir -p " + plotdir)
+print exp_mindif,"\n", exp_maxdif
+exp_ran    = np.array(zip(exp_mindif, exp_maxdif)).T
+print "Range",exp_ran
+colors     = []
+for dif in difference:
+    if dif<0: colors.append('g')
+    else    : colors.append('r')
+        
+diff_plots(act_val   , exp_val   , stocknm, "absolute")
+diff_plots(act_relval, exp_relval, stocknm,"relative")
+
 for stock in  stocks["symb"]:
     if stock not in stocknms: stocknms.append(stock)
 
-#get abs/rel difference info
-act_val    = stocks[stocks["variable"]=="act_val"][today]
-exp_val    = stocks[stocks["variable"]=="exp_val"][today]
-exp_max    = stocks[stocks["variable"]=="exp_max"][today]
-exp_min    = stocks[stocks["variable"]=="exp_min"][today]
-exp_mindif = exp_val.reset_index(drop=True)-exp_min.reset_index(drop=True)
-exp_maxdif = exp_max.reset_index(drop=True)-exp_val.reset_index(drop=True)
-exp_ran    = np.array(list(zip(exp_mindif, exp_maxdif))).T
 
-act_relval    = -100 + 100*act_val/act_val
-exp_relval    = -100 + 100*(exp_val.reset_index(drop=True)/act_val.reset_index(drop=True))
-exp_minreldif = 100*exp_mindif.reset_index(drop=True)/act_val.reset_index(drop=True)
-exp_maxreldif = 100*exp_maxdif.reset_index(drop=True)/act_val.reset_index(drop=True)
-exp_relran    = np.array(list(zip(exp_minreldif, exp_maxreldif))).T
 
 #Get sell info
 buy    = stocks[stocks["variable"]=="buy"    ][today].reset_index(drop=True)
@@ -93,19 +106,7 @@ plt.savefig(plotdir+"rel_recommendations.png")
 plt.clf()    
     
 
-difference = act_val.reset_index() -exp_val.reset_index()
-colors     = []
-longcolors = []
-for dif in difference[today]:
-    if dif<0:
-        colors.append('g')
-        longcolors.append([0,1,0,1])
-    else:
-        colors.append('r')
-        longcolors.append([1,0,0,1])
 
         
 
-diff_plots(act_val   , exp_val   , "absolute")
-diff_plots(act_relval, exp_relval, "relative")
 
