@@ -73,8 +73,6 @@ pid        = [x["id"] for x in portfolio]
 r          = requests.post(url, headers=header, params=payload, data=json.dumps(pid))
 extra_info = r.json()
 
-print extra_info['data']['13540852'].keys()
-#exit()
 for add_i in extra_info["data"]:
     for key in BEP[add_i]:
         extra_info["data"][add_i][key] = BEP[add_i][key]
