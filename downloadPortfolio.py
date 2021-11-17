@@ -46,6 +46,8 @@ for currency in data["cashFunds"]["value"]:
     cashfund[code] = value
 
 
+print cashfund
+
 ## get portfolio
 temp_portfolio = []
 for position in data["portfolio"]["value"]:
@@ -58,8 +60,10 @@ portfolio = list(filter(lambda x: x["positionType"] == "PRODUCT" and x["size"]>0
 
 BEP = {}
 for fund in portfolio:
-    BEP[fund["id"]] = fund["breakEvenPrice"]
-    
+    BEP[fund["id"]] = { "BEP"       : fund["breakEvenPrice"],
+                        "size"      :  fund['size'],
+                        'price'     : fund['price'],
+                        'gain/loss' : round(abs(fund['todayPlBase']['EUR'])-abs(fund['plBase']['EUR']),4)}#float(fund['value'])-float(fund['plBase']) }
 
 
 ## get product info
@@ -70,7 +74,10 @@ r          = requests.post(url, headers=header, params=payload, data=json.dumps(
 extra_info = r.json()
 
 for add_i in extra_info["data"]:
-    extra_info["data"][add_i]["BEP"] = BEP[add_i]
+    for key in BEP[add_i]:
+        extra_info["data"][add_i][key] = BEP[add_i][key]
+
+    exit()
 
 
 #save to json
