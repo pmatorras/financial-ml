@@ -143,10 +143,10 @@ def getStocks(stocks, type_i):
         json_i["exp_perc"] = float(exp_perc)
         json_i["nrecos"  ] = float(nrecos)
         json_i["nmonths" ] = float(nmonths)
-        json_i["vol_1"   ] = float(vol_1)
+        json_i["vol_1"   ] = int  (vol_1)
         json_i["max_1"   ] = float(max_1)
         json_i["min_1"   ] = float(min_1)
-        json_i["vol_52"  ] = float(vol_52)
+        json_i["vol_52"  ] = int  (vol_52)
         json_i["max_52"  ] = float(max_52)
         json_i["min_52"  ] = float(min_52)
         
