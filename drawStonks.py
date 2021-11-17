@@ -87,7 +87,7 @@ for isin in portfolio:
     exp_min  = np.append(exp_min , portfolio[isin][u'exp_min'])
     BEP      = np.append(BEP     , portfolio[isin][u'BEP'])
     gainloss = np.append(gainloss, portfolio[isin][u'gain/loss'])
-    size     = np.append(size, portfolio[isin][u'size'])
+    size     = np.append(size    , portfolio[isin][u'size'])
     
     recos  = portfolio[isin][u'recos']
     nrecos = np.append(nrecos,portfolio[isin][u'nrecos'])
