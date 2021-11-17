@@ -12,7 +12,6 @@ def makerecoplots(sell, underw, hold, overw, buy):
     colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
     reconms = ["sell", "underweight", "hold", "overwight", "buy" ]
     order   = [4,3,2,1,0]
-    print  stocknm, sell
     plt.bar(stocknm,sell  , color=colrec[0], label=reconms[0])
     plt.bar(stocknm,underw, color=colrec[1], label=reconms[1], bottom=sell)
     plt.bar(stocknm,hold  , color=colrec[2], label=reconms[2], bottom=(sell+underw))
@@ -43,19 +42,32 @@ def diff_plots(act_val, exp_val,BEP,typedif):
     plt.clf()
 
 
+def gainlossplots(gainloss, plot_type):
+    if 'rel' in plot_type: l_type='[%]'
+    else: l_type = '[EUR]'
+    
+    plt.axhline(0, color='black', linestyle='-')
+    plt.bar(stocknm, gainloss, color= cgainloss)
+    plt.xlabel('Stock name')
+    plt.ylabel('Gain/loss '+l_type)
+    plt.title(plot_type+' Gain/loss per stock')
+    plt.savefig(plotdir+plot_type.lower()+"_gain-loss.png")
+    plt.clf()
+
 today    = str(datetime.date(datetime.now()))#-timedelta(days=1)) 
 stocknm = []
 
 jsonDict  = open("act_info.json", "rb")
 portfolio = json.load(jsonDict)
 
-#print (portfolio), (stocks)
-stocknm = np.array([])
-act_val = np.array([])
-exp_val = np.array([])
-exp_max = np.array([])
-exp_min = np.array([])
-BEP     = np.array([])
+stocknm  = np.array([])
+act_val  = np.array([])
+exp_val  = np.array([])
+exp_max  = np.array([])
+exp_min  = np.array([])
+BEP      = np.array([])
+gainloss = np.array([])
+size     = np.array([])
 
 buy    = np.array([])
 overw  = np.array([])
@@ -63,15 +75,20 @@ hold   = np.array([])
 underw = np.array([])
 sell   = np.array([])
 nrecos = np.array([])
-for isin in portfolio:
-    if "ETF" in portfolio[isin]["productType"]: continue 
-    stocknm = np.append(stocknm,portfolio[isin][u'symbol'])
-    act_val = np.append(act_val,portfolio[isin][u'act_val'])
-    exp_val = np.append(exp_val,portfolio[isin][u'exp_med'])
-    exp_max = np.append(exp_max,portfolio[isin][u'exp_max'])
-    exp_min = np.append(exp_min,portfolio[isin][u'exp_min'])
-    BEP     = np.append(BEP    ,portfolio[isin][u'BEP'])
 
+for isin in portfolio:
+    if "ETF" in portfolio[isin]["productType"]:
+        ETF_info = portfolio[isin]["productType"]
+        continue 
+    stocknm  = np.append(stocknm , portfolio[isin][u'symbol'])
+    act_val  = np.append(act_val , portfolio[isin][u'act_val'])
+    exp_val  = np.append(exp_val , portfolio[isin][u'exp_med'])
+    exp_max  = np.append(exp_max , portfolio[isin][u'exp_max'])
+    exp_min  = np.append(exp_min , portfolio[isin][u'exp_min'])
+    BEP      = np.append(BEP     , portfolio[isin][u'BEP'])
+    gainloss = np.append(gainloss, portfolio[isin][u'gain/loss'])
+    size     = np.append(size, portfolio[isin][u'size'])
+    
     recos  = portfolio[isin][u'recos']
     nrecos = np.append(nrecos,portfolio[isin][u'nrecos'])
     buy    = np.append(buy   , int( recos[0]))
@@ -93,15 +110,17 @@ exp_minreldif = 100*exp_mindif/act_val
 exp_maxreldif = 100*exp_maxdif/act_val
 exp_relran    = np.array(list(zip(exp_minreldif, exp_maxreldif))).T
 exp_ran       = np.array(zip(exp_mindif, exp_maxdif)).T
-print "Range",exp_ran
-colors     = []
-for dif in difference:
-    if dif<0: colors.append('g')
-    else    : colors.append('r')
 
-diff_plots(act_val   , exp_val   , BEP, "absolute")
-diff_plots(act_relval, exp_relval, BEP,"relative")
-diff_plots(act_relBEP, exp_relBEP, relBEP,"relative BEP")
+colors     = [ 'r' if i < 0 else 'g' for i in difference]
+cgainloss  = [ 'r' if i < 0 else 'g' for i in gainloss]
+
+
+gainlossplots(gainloss/(0.01*BEP*size), 'Relative')
+gainlossplots(gainloss                , 'Total')
+
+diff_plots(act_val   , exp_val   , BEP   , "absolute")
+diff_plots(act_relval, exp_relval, BEP   , "relative")
+diff_plots(act_relBEP, exp_relBEP, relBEP, "relative BEP")
 
 
 makerecoplots(sell, underw, hold, overw, buy)
