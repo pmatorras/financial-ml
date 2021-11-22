@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np
+import numpy  as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os, sys, json
@@ -88,26 +88,26 @@ if __name__ == '__main__':
     sell   = np.array([])
     nrecos = np.array([])
 
-    for isin in portfolio:
-        if "ETF" in portfolio[isin]["productType"]:
-            ETF_info = portfolio[isin]["productType"]
+    for stock_id in portfolio:
+        if "ETF" in portfolio[stock_id]["productType"]:
+            ETF_info = portfolio[stock_id]["productType"]
             continue 
-        stocknm  = np.append(stocknm , portfolio[isin][u'symbol'])
-        act_val  = np.append(act_val , portfolio[isin][u'act_val'])
-        exp_val  = np.append(exp_val , portfolio[isin][u'exp_med'])
-        exp_max  = np.append(exp_max , portfolio[isin][u'exp_max'])
-        exp_min  = np.append(exp_min , portfolio[isin][u'exp_min'])
-        BEP      = np.append(BEP     , portfolio[isin][u'BEP'])
-        gainloss = np.append(gainloss, portfolio[isin][u'gain/loss'])
-        size     = np.append(size    , portfolio[isin][u'size'])
+        stocknm  = np.append(stocknm , portfolio[stock_id][u'symbol'])
+        act_val  = np.append(act_val , portfolio[stock_id][u'act_val'])
+        exp_val  = np.append(exp_val , portfolio[stock_id][u'exp_med'])
+        exp_max  = np.append(exp_max , portfolio[stock_id][u'exp_max'])
+        exp_min  = np.append(exp_min , portfolio[stock_id][u'exp_min'])
+        BEP      = np.append(BEP     , portfolio[stock_id][u'BEP'])
+        gainloss = np.append(gainloss, portfolio[stock_id][u'gain/loss'])
+        size     = np.append(size    , portfolio[stock_id][u'size'])
 
-        max_1    = np.append(max_1   , portfolio[isin][u'max_1'])
-        max_52   = np.append(max_52  , portfolio[isin][u'max_52'])
-        min_1    = np.append(max_1   , portfolio[isin][u'min_1'])
-        min_52   = np.append(min_52  , portfolio[isin][u'min_52'])
+        max_1    = np.append(max_1   , portfolio[stock_id][u'max_1'])
+        max_52   = np.append(max_52  , portfolio[stock_id][u'max_52'])
+        min_1    = np.append(max_1   , portfolio[stock_id][u'min_1'])
+        min_52   = np.append(min_52  , portfolio[stock_id][u'min_52'])
 
-        recos  = portfolio[isin][u'recos']
-        nrecos = np.append(nrecos,portfolio[isin][u'nrecos'])
+        recos  = portfolio[stock_id][u'recos']
+        nrecos = np.append(nrecos,portfolio[stock_id][u'nrecos'])
         buy    = np.append(buy   , int( recos[0]))
         overw  = np.append(overw , int( recos[1]))
         hold   = np.append(hold  , int( recos[2]))
