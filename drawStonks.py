@@ -6,7 +6,8 @@ import os, sys, json
 foldir   = os.path.dirname(sys.argv[0])
 if "/"  in foldir: foldir += "/" 
 plotdir  = foldir+"Plots/"
-os.system("mkdir -p " + plotdir)
+foredir  = plotdir+"Forecast/"
+os.system("mkdir -p " + foredir)
 
 
 #plot difference
@@ -27,7 +28,7 @@ def diff_plots(act_val, exp_val,BEP,ran_52, typedif):
     plt.title(typedif+" expected gain/loss")
     plt.legend()
     plt.tick_params(axis='x', rotation=45)
-    plt.savefig(plotdir+typedif.replace(" ","-").lower()+"_difference.png")
+    plt.savefig(foredir+typedif.replace(" ","-").lower()+"_difference.png")
     plt.clf()
 
 #Plot recommendation plots
@@ -56,7 +57,7 @@ def gainlossplots(gainloss, plot_type):
     plt.xlabel('Stock name')
     plt.ylabel('Gain/loss '+l_type)
     plt.title(plot_type+' Gain/loss per stock')
-    plt.savefig(plotdir+plot_type.lower()+"_gain-loss.png")
+    plt.savefig(foredir+plot_type.lower()+"_gain-loss.png")
     plt.clf()
 
 today    = str(datetime.date(datetime.now()))#-timedelta(days=1)) 
