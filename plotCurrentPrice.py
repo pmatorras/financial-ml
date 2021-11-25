@@ -5,6 +5,14 @@ import matplotlib.dates as mdates
 register_matplotlib_converters()
 import plotly.graph_objects as go
 
+def onlySamples(doOnly, onlySymbs, stock_sym):
+    if doOnly:
+        isHere = False
+        for onlysymb in onlySymbs:
+            if onlysymb in stock_sym: isHere = True
+        return isHere
+    else:
+        return True
 jsonDict  = open("act_info.json", "rb")
 portfolio = json.load(jsonDict)
 keys      = ''
@@ -16,6 +24,8 @@ stockinfo = {}
 for stock_id in portfolio:
     symbol  = portfolio[stock_id][u'symbol']
     isin    = portfolio[stock_id][u'isin']
+    isHere  = onlySamples(doOnly,onlySymbs, symbol)
+    if isHere is False: continue
     stocknm. append(portfolio[stock_id][u'name'])
     currency.append(portfolio[stock_id][u'currency'])
     ext     = ''
@@ -28,10 +38,18 @@ for stock_id in portfolio:
     print symbol, isin
     stockinfo[symbol+ext] = {"isin" : isin, "name": portfolio[stock_id][u'name'], "currency" : portfolio[stock_id][u'currency']}
 
-#keys    = "VOW3.DE PRX.AS"
-periods = ["ytd"]
-
+print "Checking Stocks", keys
+valid_periods = ["1d","5d","1mo","3mo","6mo","1y","2y","5y","10y","ytd","max"]
+if opt.period:
+    periods = opt.period.split('_')
+    
+else:
+    periods = ["ytd"]
 for period in periods:
+    if period not in valid_periods:
+        print "invalid period", period
+        continue
+        
     data = yf.download(keys, period=period)
     old  = data.reset_index()
     print old.keys()
@@ -48,4 +66,4 @@ for period in periods:
             yaxis_title = key+' Stock')
         fig.write_image(fignm)
         print "Plotting", fignm
-        #fig.show()
+        if opt.interact: fig.show()
