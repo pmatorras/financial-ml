@@ -13,3 +13,9 @@ Two different plotting options are currently available:
 -s : Show current price for each product (-s).
 
 Both cases can be run at once with the -b option
+
+
+Note that for the Stock plotter, the following dependencies are required:
+	     pip install plotly
+	     pip install yfinance
+	     pip install -U Kaleido
