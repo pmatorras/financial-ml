@@ -3,10 +3,12 @@ from pandas.plotting import register_matplotlib_converters
 import yfinance         as yf
 import matplotlib.dates as mdates
 register_matplotlib_converters()
+import plotly.graph_objects as go
+
 jsonDict  = open("act_info.json", "rb")
 portfolio = json.load(jsonDict)
 keys      = ''
-stockpdir = plotdir+"/Stocks/"
+stockpdir = plotdir+"Stocks/"
 stocknm   = []
 currency  = []
 os.system('mkdir -p '+ stockpdir) 
@@ -28,19 +30,22 @@ for stock_id in portfolio:
 
 #keys    = "VOW3.DE PRX.AS"
 periods = ["ytd"]
+
 for period in periods:
     data = yf.download(keys, period=period)
-
+    old  = data.reset_index()
+    print old.keys()
     for idx, key, in enumerate(keys.strip().split(' ')):
-        print key
-        plt.plot(data["Close"][key])
-        plt.ylabel("Price ["+stockinfo[key]["currency"]+"]")
-        plt.xlabel("Day")
-        plt.title("Stock price, "+stockinfo[key]["name"]+" ("+period+")")
-        ax = plt.gca()
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%Y'))
-        for label in ax.get_xticklabels(which='major'):
-            label.set(rotation=30, horizontalalignment='right')
+        fignm = stockpdir+key.replace('.','-')+"_"+period+".png"
+        fig = go.Figure(data  = [go.Candlestick(x     = old['Date'],
+                                                open  = old['Open'][key],
+                                                high  = old['High'][key],
+                                                low   = old['Low'][key],
+                                                close = old['Close'][key])])
 
-        plt.savefig(stockpdir+"Stocks_"+key.replace('.','_')+".png")
-        plt.clf()
+        fig.update_layout(
+            title       = "Stock price, "+stockinfo[key]["name"]+" ("+period+")",
+            yaxis_title = key+' Stock')
+        fig.write_image(fignm)
+        print "Plotting", fignm
+        #fig.show()
