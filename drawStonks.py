@@ -32,7 +32,10 @@ if __name__ == '__main__':
     if      opt.both : script_run = [currname, forename]
     elif   opt.fcast : script_run = [forename]
     elif   opt.stock : script_run = [currname]
-
+    else:
+        print "no running option set, please run either:"
+        print "-s for stock charts\n-f for stock forecast\n-b for both"
+        exit()
     onlySymbs = []
     doOnly    = opt.only
     if opt.only:
@@ -40,8 +43,7 @@ if __name__ == '__main__':
     if opt.test:
         onlySymbs  = ["VOW3", "PRX"]
         doOnly     = True
-        print "only running on", onlySymbs
-
+    print script_run
     for script in script_run:
         print "Processing "+script
         execfile(foldir+script)
