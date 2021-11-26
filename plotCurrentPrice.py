@@ -14,7 +14,6 @@ def onlySamples(doOnly, onlySymbs, stock_sym):
         return True
 
 if __name__== '__main__':
-    print "ee"
     jsonDict  = open("act_info.json", "rb")
     portfolio = json.load(jsonDict)
     keys      = ''
@@ -40,35 +39,57 @@ if __name__== '__main__':
         print symbol, isin
         stockinfo[symbol+ext] = {"isin" : isin, "name": portfolio[stock_id][u'name'], "currency" : portfolio[stock_id][u'currency']}
 
-    print "Checking Stocks", keys
-    valid_periods = ["1d","5d","1mo","3mo","6mo","1y","2y","5y","10y","ytd","max"]
+    period_info = {"1d" : { "interval" : "5m"  , "Date" : "Datetime"}, "5d" : { "interval" : "30m", "Date" : "Datetime" },
+                   "1mo": { "interval" : "1d"  , "Date" : "Date"    }, "3mo": { "interval" : "1d" , "Date" : "Date" },
+                   "6mo": { "interval" : "1d"  , "Date" : "Date"    }, "ytd": { "interval" : "1d" , "Date" : "Date" }, 
+                   "1y" : { "interval" : "1wk" , "Date" : "Date"    }, "2y" : { "interval" : "1wk", "Date" : "Date" },
+                   "5y" : { "interval" : "1mo" , "Date" : "Date"    }, "10y": { "interval" : "3mo", "Date" : "Date" },
+                   "max": { "interval" : "3mo", "Date" : "Date"    } }
+    
     if opt.period:
-        if "all" in opt.period: periods= valid_periods
+        if "all" in opt.period: periods= period_info #valid_periods
         else:
             periods = opt.period.split('_')
-
     else:
+        print "in else"
         periods = ["ytd"]
+
+    #make plotting
     for period in periods:
-        if period not in valid_periods:
+        if period not in period_info.keys():
             print "invalid period", period
+            print "Please choose one of these:", period_info.keys()
             continue
 
-        print "eee"
-        data = yf.download(keys, period=period)
-        old  = data.reset_index()
-        print old.keys()
+        data = yf.download(keys, period=period, interval=period_info[period]["interval"]).reset_index()
         for idx, key, in enumerate(keys.strip().split(' ')):
             fignm = stockpdir+key.replace('.','-')+"_"+period+".png"
-            fig = go.Figure(data  = [go.Candlestick(x     = old['Date'],
-                                                    open  = old['Open'][key],
-                                                    high  = old['High'][key],
-                                                    low   = old['Low'][key],
-                                                    close = old['Close'][key])])
+            fig   = go.Figure(data  = [go.Candlestick(x     = data[period_info[period]["Date"]],
+                                                      open  = data['Open'][key],
+                                                      high  = data['High'][key],
+                                                      low   = data['Low'][key],
+                                                      close = data['Close'][key])])
 
             fig.update_layout(
-                title       = "Stock price, "+stockinfo[key]["name"]+" ("+period+")",
-                yaxis_title = key+' Stock')
-            fig.write_image(fignm)
+                height = 500,
+                title  = dict(
+                    text = "<b>Stock price, "+stockinfo[key]["name"]+" ("+period+")</b>",
+                    x    = 0.5,
+                    y    = 0.95,
+                    font = dict(
+                        family = "Arial",
+                        size   = 26,
+                        color  = '#000000'
+                    )
+                ),
+                yaxis_title = '<b>'+key+' Stock</b>',
+                font        = dict(
+                    family = "Courier New, Monospace",
+                    size   = 16,
+                    color  = '#000000'
+                )
+            )
+
+            fig.write_image(fignm, scale=1, height=900, width=1200 )
             print "Plotting", fignm
             if opt.interact: fig.show()
