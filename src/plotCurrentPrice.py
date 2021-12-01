@@ -1,8 +1,8 @@
-from pandas.plotting import register_matplotlib_converters
-import yfinance         as yf
-import matplotlib.dates as mdates
-register_matplotlib_converters()
 import plotly.graph_objects as go
+import yfinance             as yf
+from   pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+
 
 def onlySamples(doOnly, onlySymbs, stock_sym):
     if doOnly:
@@ -14,7 +14,7 @@ def onlySamples(doOnly, onlySymbs, stock_sym):
         return True
 
 if __name__== '__main__':
-    jsonDict  = open("act_info.json", "rb")
+    jsonDict  = open(act_info, "rb")
     portfolio = json.load(jsonDict)
     keys      = ''
     stockpdir = plotdir+"Stocks/"

@@ -1,7 +1,3 @@
-#from drawStonks import *
-foredir  = plotdir+"Forecast/"
-os.system("mkdir -p " + foredir)
-
 
 #plot difference
 def diff_plots(act_val, exp_val,BEP,ran_52, typedif):
@@ -58,7 +54,7 @@ today    = str(datetime.date(datetime.now()))#-timedelta(days=1))
 if __name__ == '__main__':
     stocknm = []
 
-    jsonDict  = open("act_info.json", "rb")
+    jsonDict  = open(act_info, "rb")
     portfolio = json.load(jsonDict)
 
     stocknm  = np.array([])

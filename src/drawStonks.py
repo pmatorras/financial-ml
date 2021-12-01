@@ -1,15 +1,6 @@
-import pandas as pd
 import numpy  as np
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-import os, sys, json, optparse
-today    = str(datetime.date(datetime.now()))#-timedelta(days=1)) 
-foldir   = os.path.dirname(sys.argv[0])
-if "/"  in foldir: foldir += "/" 
-plotdir  = foldir+"Plots/"
-foredir  = plotdir+"Forecast/"
-os.system("mkdir -p " + foredir)
-
+from variables import *
 
 
 if __name__ == '__main__':
@@ -46,4 +37,4 @@ if __name__ == '__main__':
     print script_run
     for script in script_run:
         print "Processing "+script
-        execfile(foldir+script)
+        execfile(srcdir+script)
