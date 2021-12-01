@@ -1,13 +1,5 @@
-
 from googlesearch import search
 from variables    import *
-
-srcdir  = os.getcwd()+'/'+os.path.dirname(sys.argv[0])
-if "/" not in srcdir[-1]: srcdir += "/"
-datadir = srcdir + "../Data/" 
-
-os.system('mkdir -p ' + datadir)
-
 
 
 if __name__ == '__main__':

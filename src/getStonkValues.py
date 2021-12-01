@@ -1,22 +1,4 @@
- # -*- coding: utf-8 -*-
-
 from variables import *
-#Define basic variables
-# coding=utf-8
-utf8    = '# coding=utf-8 \n'
-now     = datetime.now()
-today   = datetime.date(now)
-foldir  = os.path.dirname(sys.argv[0])
-CRED    = '\033[91m'
-CEND    = '\033[0m'
-if '/' in foldir: foldir+='/'
-jsonFile   = open(datadir+"full_portfolio.json", "rb")
-jsonStocks = json.load(jsonFile)
-symb_isin  = {}
-for entry in jsonStocks:
-    symb_isin[jsonStocks[entry]["symbol"]]=entry
-
-
 
 def getBetween(string, before, after):
     
@@ -128,16 +110,21 @@ def getStocks(stocks, type_i):
         
         printValues(stock, stocksym, BEP, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
         
+if __name__ == '__main__':
+
+    jsonFile   = open(datadir+"full_portfolio.json", "rb")
+    jsonStocks = json.load(jsonFile)
+    symb_isin  = {}
+    for entry in jsonStocks:
+        symb_isin[jsonStocks[entry]["symbol"]]=entry
+
+    pickleDict = open(datadir+"Portfolio_dict.pkl", "rb")
+    portfolio  = pickle.load(pickleDict)
 
 
-   
-pickleDict = open(datadir+"Portfolio_dict.pkl", "rb")
-portfolio  = pickle.load(pickleDict)
+    pickleDict.close()
 
-
-pickleDict.close()
-
-getStocks(portfolio, "multiple")
-#save to json                                              
-with open(datadir+'act_info.json', 'w') as f:
-    json.dump(jsonStocks, f, indent=4)
+    getStocks(portfolio, "multiple")
+    #save to json                                              
+    with open(datadir+'act_info.json', 'w') as f:
+        json.dump(jsonStocks, f, indent=4)
