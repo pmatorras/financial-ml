@@ -1,8 +1,6 @@
  # -*- coding: utf-8 -*-
-import requests, json, re, csv, os, pickle, requests, sys
-from bs4 import BeautifulSoup
-from datetime import datetime
-import pandas as pd
+
+from variables import *
 #Define basic variables
 # coding=utf-8
 utf8    = '# coding=utf-8 \n'
@@ -11,9 +9,8 @@ today   = datetime.date(now)
 foldir  = os.path.dirname(sys.argv[0])
 CRED    = '\033[91m'
 CEND    = '\033[0m'
-headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
 if '/' in foldir: foldir+='/'
-jsonFile   = open("full_portfolio.json", "rb")
+jsonFile   = open(datadir+"full_portfolio.json", "rb")
 jsonStocks = json.load(jsonFile)
 symb_isin  = {}
 for entry in jsonStocks:
@@ -44,6 +41,7 @@ def makeSoup(link):
 
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
+        #if "SAN" not in stocksym: continue
         json_i = jsonStocks[symb_isin[stocksym]]
         BEP     = str(json_i["BEP"])
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
@@ -95,44 +93,20 @@ def getStocks(stocks, type_i):
             histo_table = reco_info.text.split("Tendencia de las recomendaciones")[1].split("*La")[0]
             stock_info  = makeSoup(link.replace('recomendaciones/', '')).find(class_="tabla-contenedor__interior").text.split('<tr>')[0].replace('\n', ' ')
 
-            vol_1    = getBetween(stock_info, "Volumen (acciones)", "  ").replace('.','')
-            vol_52   = getBetween(stock_info, "Volumen (acciones)", "  ").replace('.','')
-            max_1    = getBetween(stock_info, u"M\xe1x. intrad\xeda", "  ").replace('.','').replace(',','.')
-            min_1    = getBetween(stock_info, u"Min. intrad\xeda"   , "  ").replace('.','').replace(',','.')
-            max_52   = getBetween(stock_info, u"M\xe1x 52 semanas " , "  ").replace('.','').replace(',','.')
-            min_52   = getBetween(stock_info, u"Min 52 semanas "    , "  ").replace('.','').replace(',','.')
-
-            act_val  = getBetween(dataset.split('Precio real'    )[1].split('data')[1], '[', ']').replace("\n\n","").split(',')[1]
-            exp_med  = getBetween(dataset.split('Precio objetivo')[1].split('data')[1], '[', ']').replace("\n\n","").split(',')[1]
+            vol_1    = getBetween(stock_info, "Volumen (acciones)"    , "  ").replace('.','')
+            vol_52   = getBetween(stock_info, "Volumen (acciones)"    , "  ").replace('.','')
+            max_1    = getBetween(stock_info, u"M\xe1x. intrad\xeda"  , "  ").replace('.','').replace(',','.')
+            min_1    = getBetween(stock_info, u"Min. intrad\xeda"     , "  ").replace('.','').replace(',','.')
+            max_52   = getBetween(stock_info, u"M\xe1x 52 semanas "   , "  ").replace('.','').replace(',','.')
+            min_52   = getBetween(stock_info, u"Min 52 semanas "      , "  ").replace('.','').replace(',','.')
+            act_val  = getBetween(stock_info, u"\xdalt. Cotizaci\xf3n", "  ").replace('.','').replace(',','.')
+            exp_med  = getBetween(dataset.split('Precio objetivo')[1].split('data')[1], '[', ']').replace("\n\n","").split(',')[0].replace(' ','')
             exp_max  = exp_med
             exp_min  = exp_med
             recos    = histo_table.split("Hoy\n")[1].split("*")[0].split("\n")
             nrecos   = recos[5]
             exp_perc = round(100*(float(exp_med)-float(act_val))/float(act_val),2)
             
-        elif "cnn" in stockType: #not updated
-            valheader = reco_info.find(class_='wsod_last')
-            act_val   = getBetween(str(valheader), '"ToHundredth">', "</span")
-            name      = str(reco_info.find(class_="wsod_fLeft wsod_narrowH1Container"))
-            forecast  = str(reco_info.find(class_='wsod_twoCol clearfix'))
-            numbers   =  re.findall(r"[-+]?\d*\.\d+|\d+", forecast)
-            nrecos    = numbers[0]
-            nmonths   = numbers[1]
-            exp_med   = numbers[2]
-            exp_max   = numbers[3]
-            exp_min   = numbers[4]
-            exp_perc  = numbers[5]
-            act_val2  = numbers[6]
-
-            col_ini = CEND
-            if   "-" in exp_perc : col_ini = '\033[31m'
-            elif "+" in exp_perc : col_ini =  '\033[32m'
-            col_end = CEND
-
-            if float(act_val) != float(act_val2):
-                print CRED + "Error, numbers "+act_val+" and "+act_val2+" are different!" + CEND
-            recos = [0,0,0,0,0]
-
         else:
             print "unrecognised stock Type", stockType
             continue
@@ -157,7 +131,7 @@ def getStocks(stocks, type_i):
 
 
    
-pickleDict = open(foldir+"Portfolio_dict.pkl", "rb")
+pickleDict = open(datadir+"Portfolio_dict.pkl", "rb")
 portfolio  = pickle.load(pickleDict)
 
 
@@ -165,5 +139,5 @@ pickleDict.close()
 
 getStocks(portfolio, "multiple")
 #save to json                                              
-with open('act_info.json', 'w') as f:
+with open(datadir+'act_info.json', 'w') as f:
     json.dump(jsonStocks, f, indent=4)
