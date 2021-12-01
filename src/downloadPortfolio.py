@@ -72,12 +72,11 @@ if __name__ == '__main__':
     r          = requests.post(url, headers=header, params=payload, data=json.dumps(pid))
     extra_info = r.json()
 
+    #Add extra info and save
     for add_i in extra_info["data"]:
         for key in BEP[add_i]:
             extra_info["data"][add_i][key] = BEP[add_i][key]
 
-
-    #save to json
-    with open(datadir+'full_portfolio.json', 'w') as f:
+    with open(full_port, 'w') as f:
         json.dump(extra_info["data"], f, indent=4)
 

@@ -40,7 +40,7 @@ def getLinksGoogle(site, stock, recom):
 
 if __name__ == '__main__':
     stocks_csv = {}
-    jsonDict   = open(datadir+"full_portfolio.json", "rb")
+    jsonDict   = open(full_port, "rb")
     portfolio  = json.load(jsonDict)
     jsonDict.close()
 
@@ -61,6 +61,6 @@ if __name__ == '__main__':
 
 
 
-    f = open(datadir+"Portfolio_dict.pkl","wb")
+    f = open(port_pkl,"wb")
     pickle.dump(stocks_csv,f)
     f.close()

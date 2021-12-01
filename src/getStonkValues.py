@@ -24,7 +24,7 @@ def makeSoup(link):
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
         #if "SAN" not in stocksym: continue
-        json_i = jsonStocks[symb_isin[stocksym]]
+        json_i  = jsonStocks[symb_isin[stocksym]]
         BEP     = str(json_i["BEP"])
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
         else:
@@ -112,13 +112,13 @@ def getStocks(stocks, type_i):
         
 if __name__ == '__main__':
 
-    jsonFile   = open(datadir+"full_portfolio.json", "rb")
+    jsonFile   = open(full_port, "rb")
     jsonStocks = json.load(jsonFile)
     symb_isin  = {}
     for entry in jsonStocks:
         symb_isin[jsonStocks[entry]["symbol"]]=entry
 
-    pickleDict = open(datadir+"Portfolio_dict.pkl", "rb")
+    pickleDict = open(port_pkl, "rb")
     portfolio  = pickle.load(pickleDict)
 
 
@@ -126,5 +126,5 @@ if __name__ == '__main__':
 
     getStocks(portfolio, "multiple")
     #save to json                                              
-    with open(datadir+'act_info.json', 'w') as f:
+    with open(act_info, 'w') as f:
         json.dump(jsonStocks, f, indent=4)
