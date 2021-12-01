@@ -2,7 +2,7 @@
 #plot difference
 def diff_plots(act_val, exp_val,BEP,ran_52, typedif):
     plt.gcf().subplots_adjust(bottom=0.15)
-    act_plot = plt.errorbar(stocknm, act_val,yerr = ran_52 , marker="d", color='r', label="Stock. "+today, uplims=True, lolims=True, fmt = '.')
+    act_plot = plt.errorbar(stocknm, act_val,yerr = ran_52 , marker="d", color='r', label="Value. "+today, uplims=True, lolims=True, fmt = '.')
     act_plot[-1][0].set_linestyle(':')
     act_plot[-1][1].set_linestyle(':')
 
@@ -13,15 +13,15 @@ def diff_plots(act_val, exp_val,BEP,ran_52, typedif):
     exp_plot = plt.errorbar(stocknm, exp_val, yerr =exp_ran, fmt='.', color='black', label="Exp. "+gain)
     exp_plot[-1][0].set_linestyle('--')
     plt.ylabel(gain)
-    plt.xlabel("Stock name")
     plt.title(typedif+" expected gain/loss")
     plt.legend()
     plt.tick_params(axis='x', rotation=45)
+    plt.grid( color='0.75', linestyle=':')
     plt.savefig(foredir+typedif.replace(" ","-").lower()+"_difference.png")
     plt.clf()
 
 #Plot recommendation plots
-def makerecoplots(sell, underw, hold, overw, buy):
+def makerecoplots(sell, underw, hold, overw, buy, typedif):
     colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
     reconms = ["sell", "underweight", "hold", "overwight", "buy" ]
     order   = [4,3,2,1,0]
@@ -31,25 +31,31 @@ def makerecoplots(sell, underw, hold, overw, buy):
     plt.bar(stocknm,overw , color=colrec[3], label=reconms[3], bottom=sell+underw+hold)
     plt.bar(stocknm,buy   , color=colrec[4], label=reconms[4], bottom=sell+underw+hold+overw)
 
-    plt.title("Expert recommendations")
+    perc = ""
+    if "rel" in typedif.lower() : perc+=" [%]"
+
+    plt.title("Expert recommendations"+perc)
     handles, labels = plt.gca().get_legend_handles_labels()
     plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
-    plt.xlabel("company")
-
-
+    plt.ylabel("Exp. recom."+perc)
+    plt.tick_params(axis='x', rotation=45)
+    plt.savefig(foredir+typedif+"_recommendations.png")
+    plt.clf()
+    
 def gainlossplots(gainloss, plot_type):
     if 'rel' in plot_type: l_type='[%]'
     else: l_type = '[EUR]'
     
     plt.axhline(0, color='black', linestyle='-')
     plt.bar(stocknm, gainloss, color= cgainloss)
-    plt.xlabel('Stock name')
     plt.ylabel('Gain/loss '+l_type)
     plt.title(plot_type+' Gain/loss per stock')
+    plt.tick_params(axis='x', rotation=45)
+    plt.grid(axis='y', color='0.75', linestyle=':')
     plt.savefig(foredir+plot_type.lower()+"_gain-loss.png")
     plt.clf()
 
-today    = str(datetime.date(datetime.now()))#-timedelta(days=1)) 
+today    = str(datetime.date(datetime.now()))
 
 if __name__ == '__main__':
     stocknm = []
@@ -71,12 +77,13 @@ if __name__ == '__main__':
     min_1    = np.array([])
     min_52   = np.array([])
 
-    buy    = np.array([])
-    overw  = np.array([])
-    hold   = np.array([])
-    underw = np.array([])
-    sell   = np.array([])
-    nrecos = np.array([])
+    buy     = np.array([])
+    overw   = np.array([])
+    hold    = np.array([])
+    underw  = np.array([])
+    sell    = np.array([])
+    nrecos  = np.array([])
+    reco_wi = np.array([])
 
     for stock_id in portfolio:
         if "ETF" in portfolio[stock_id]["productType"]:
@@ -96,13 +103,14 @@ if __name__ == '__main__':
         min_1    = np.append(max_1   , portfolio[stock_id][u'min_1'])
         min_52   = np.append(min_52  , portfolio[stock_id][u'min_52'])
 
-        recos  = portfolio[stock_id][u'recos']
-        nrecos = np.append(nrecos,portfolio[stock_id][u'nrecos'])
-        buy    = np.append(buy   , int( recos[0]))
-        overw  = np.append(overw , int( recos[1]))
-        hold   = np.append(hold  , int( recos[2]))
-        underw = np.append(underw, int( recos[3]))
-        sell   = np.append(sell  , int( recos[4]))
+        recos   = portfolio[stock_id][u'recos']
+        nrecos  = np.append(nrecos , portfolio[stock_id][u'nrecos'])
+        reco_wi = np.append(reco_wi, portfolio[stock_id][u'reco_wi'])
+        buy     = np.append(buy    , int( recos[0]))
+        overw   = np.append(overw  , int( recos[1]))
+        hold    = np.append(hold   , int( recos[2]))
+        underw  = np.append(underw , int( recos[3]))
+        sell    = np.append(sell   , int( recos[4]))
 
     #get differences
     exp_mindif    = exp_val-exp_min
@@ -121,18 +129,26 @@ if __name__ == '__main__':
     colors     = [ 'r' if i < 0 else 'g' for i in difference]
     cgainloss  = [ 'r' if i < 0 else 'g' for i in gainloss]
 
-
-    gainlossplots(gainloss/(0.01*BEP*size), 'Relative')
-    gainlossplots(gainloss                , 'Total')
-    ran_52 = [act_val-min_52, max_52-act_val]
+    ran_52    = [act_val-min_52, max_52-act_val]
     relran_52 = 100*(ran_52/act_val)
     BEPran_52 = 100*(ran_52/BEP)
 
-
+    #Gain/Loss plots
+    gainlossplots(gainloss/(0.01*BEP*size), 'Relative')
+    gainlossplots(gainloss                , 'Total')
+    #Different pltos
     diff_plots(act_val   , exp_val   , BEP   ,ran_52   , "Absolute")
     diff_plots(act_relval, exp_relval, BEP   ,relran_52, "Relative")
     diff_plots(act_relBEP, exp_relBEP, relBEP,BEPran_52, "relative BEP")
+    #Recommendation plots
+    makerecoplots(sell, underw, hold, overw, buy, "Absolute")
+    makerecoplots(100*sell/nrecos, 100* underw/nrecos, 100*hold/nrecos, 100*overw/nrecos, 100*buy/nrecos, "Relative")
 
+    plt.scatter(stocknm, reco_wi, c=reco_wi, cmap="RdYlGn_r")
+    plt.clim(1,5)
+    plt.grid(color='0.75', linestyle=':')
+    plt.title("Buy/sell consensus (1-5) per stock")
+    plt.tick_params(axis='x', rotation=45)
+    plt.savefig(foredir+"average_recommendation.png")
 
-    makerecoplots(sell, underw, hold, overw, buy)
-    makerecoplots(100*sell/nrecos, 100* underw/nrecos, 100*hold/nrecos, 100*overw/nrecos, 100*buy/nrecos)
+    

@@ -92,22 +92,23 @@ def getStocks(stocks, type_i):
         else:
             print "unrecognised stock Type", stockType
             continue
+        reco_wi = 0
+        for i in range(5): reco_wi += float(recos[i])*(i+1)
         json_i["act_val" ] = float(act_val)
         json_i["exp_med" ] = float(exp_med)
         json_i["exp_max" ] = float(exp_max)
         json_i["exp_min" ] = float(exp_min)
         json_i["exp_perc"] = float(exp_perc)
-        json_i["nrecos"  ] = float(nrecos)
         json_i["nmonths" ] = float(nmonths)
-        json_i["vol_1"   ] = int  (vol_1)
         json_i["max_1"   ] = float(max_1)
         json_i["min_1"   ] = float(min_1)
-        json_i["vol_52"  ] = int  (vol_52)
         json_i["max_52"  ] = float(max_52)
         json_i["min_52"  ] = float(min_52)
-        
+        json_i["vol_1"   ] = int  (vol_1)
+        json_i["vol_52"  ] = int  (vol_52)
+        json_i["nrecos"  ] = int(nrecos)
         json_i["recos"   ] = recos
-        
+        json_i["reco_wi" ] = round(reco_wi/int(nrecos),3)
         printValues(stock, stocksym, BEP, act_val, exp_med, exp_max, exp_min, exp_perc, nrecos, nmonths)
         
 if __name__ == '__main__':
