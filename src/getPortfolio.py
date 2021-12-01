@@ -1,11 +1,6 @@
-import requests, json, re, csv, os, pickle, optparse
-import pandas as pd
-import requests, sys
 
-from bs4          import BeautifulSoup
-from datetime     import datetime
 from googlesearch import search
-
+from variables    import *
 
 srcdir  = os.getcwd()+'/'+os.path.dirname(sys.argv[0])
 if "/" not in srcdir[-1]: srcdir += "/"

@@ -1,8 +1,4 @@
 
-
-headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'}
-
-
 def makeSoup(link):
     print link
     request   = requests.get(link, headers=headers)
