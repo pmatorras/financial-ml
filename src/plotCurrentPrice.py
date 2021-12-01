@@ -61,9 +61,11 @@ if __name__== '__main__':
             print "Please choose one of these:", period_info.keys()
             continue
 
-        data = yf.download(keys, period=period, interval=period_info[period]["interval"]).reset_index()
+        data   = yf.download(keys, period=period, interval=period_info[period]["interval"]).reset_index()
+        perdir = stockpdir+'/'+period+'/'
+        os.system('mkdir -p ' + perdir)
         for idx, key, in enumerate(keys.strip().split(' ')):
-            fignm = stockpdir+key.replace('.','-')+"_"+period+".png"
+            fignm = perdir+key.replace('.','-')+"_"+period+".png"
             fig   = go.Figure(data  = [go.Candlestick(x     = data[period_info[period]["Date"]],
                                                       open  = data['Open'][key],
                                                       high  = data['High'][key],
