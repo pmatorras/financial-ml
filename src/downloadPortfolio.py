@@ -62,7 +62,7 @@ if __name__ == '__main__':
     BEP = {}
     for fund in portfolio:
         BEP[fund["id"]] = { "BEP"       : fund["breakEvenPrice"],
-                            "size"      :  fund['size'],
+                            "size"      : fund['size'],
                             'price'     : fund['price'],
                             'gain/loss' : round(abs(fund['todayPlBase']['EUR'])-abs(fund['plBase']['EUR']),4)}
     #product info

@@ -1,7 +1,8 @@
 
 def makeSoup(link):
     print link
-    request   = requests.get(link, headers=headers)
+    print headers["2"]
+    request   = requests.get(link, headers=headers["2"])
     return  BeautifulSoup(request.text,"lxml")
 
 
@@ -15,9 +16,13 @@ def getLinksGoogle(site, stock, recom):
     links  = []
     symb_i = stock["symbol"]
     name_i = stock["name"  ].replace("SA","")
-    query  = site+ symb_i+" "+name_i+" "+recom
-    print "Stock", symb_i, "\t query", query
-
+    isin_i = stock["isin"][:2]
+    if "US" in isin_i or "ES" in isin_i:
+        query = site+ symb_i+" "+name_i+" "+recom
+    else:
+        if "FR" in isin_i: isin_i='XE'
+        query = site+ symb_i+" "+ name_i+" "+isin_i+" "+recom
+    print "Stock", symb_i, ", query:\n", query
     loopqueries(query,recom,links)
     if len(links) == 0 :
         query = site + symb_i + recom 

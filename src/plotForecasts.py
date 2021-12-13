@@ -2,28 +2,28 @@
 #plot difference
 def diff_plots(act_val, exp_val,BEP,ran_52, typedif):
     plt.gcf().subplots_adjust(bottom=0.15)
-    act_plot = plt.errorbar(stocknm, act_val,yerr = ran_52 , marker="d", color='r', label="Value. "+today, uplims=True, lolims=True, fmt = '.')
+    act_plot = plt.errorbar(stocknm, act_val,yerr = ran_52 , marker='d', color='r', label='Value. '+today, uplims=True, lolims=True, fmt = '.')
     act_plot[-1][0].set_linestyle(':')
     act_plot[-1][1].set_linestyle(':')
 
-    if "abs" in typedif.lower() : gain = "Prize [USD]"    
-    else                        : gain = "Gain/loss [%]"
+    if 'abs' in typedif.lower() : gain = 'Prize [USD]'    
+    else                        : gain = 'Gain/loss [%]'
 
-    if "bep" in typedif.lower() or "" in typedif.lower(): plt.scatter(stocknm, BEP    , marker="_",label="Break even point", color='blue', s=80)
-    exp_plot = plt.errorbar(stocknm, exp_val, yerr =exp_ran, fmt='.', color='black', label="Exp. "+gain)
+    if 'bep' in typedif.lower() or '' in typedif.lower(): plt.scatter(stocknm, BEP    , marker='_',label='Break even point', color='blue', s=80)
+    exp_plot = plt.errorbar(stocknm, exp_val, yerr =exp_ran, fmt='.', color='black', label='Exp. '+gain)
     exp_plot[-1][0].set_linestyle('--')
     plt.ylabel(gain)
-    plt.title(typedif+" expected gain/loss")
+    plt.title(typedif+' expected gain/loss')
     plt.legend()
     plt.tick_params(axis='x', rotation=45)
     plt.grid( color='0.75', linestyle=':')
-    plt.savefig(foredir+typedif.replace(" ","-").lower()+"_difference.png")
+    plt.savefig(foredir+typedif.replace(' ','-').lower()+'_difference.png')
     plt.clf()
 
 #Plot recommendation plots
 def makerecoplots(sell, underw, hold, overw, buy, typedif):
-    colrec  = ["red", "orange", "yellow", "yellowgreen", "green"]
-    reconms = ["sell", "underweight", "hold", "overwight", "buy" ]
+    colrec  = ['red', 'orange', 'yellow', 'yellowgreen', 'green']
+    reconms = ['sell', 'underweight', 'hold', 'overwight', 'buy' ]
     order   = [4,3,2,1,0]
     plt.bar(stocknm,sell  , color=colrec[0], label=reconms[0])
     plt.bar(stocknm,underw, color=colrec[1], label=reconms[1], bottom=sell)
@@ -31,28 +31,27 @@ def makerecoplots(sell, underw, hold, overw, buy, typedif):
     plt.bar(stocknm,overw , color=colrec[3], label=reconms[3], bottom=sell+underw+hold)
     plt.bar(stocknm,buy   , color=colrec[4], label=reconms[4], bottom=sell+underw+hold+overw)
 
-    perc = ""
-    if "rel" in typedif.lower() : perc+=" [%]"
+    perc = ''
+    if 'rel' in typedif.lower() : perc+=' [%]'
 
-    plt.title("Expert recommendations"+perc)
+    plt.title('Expert recommendations'+perc)
     handles, labels = plt.gca().get_legend_handles_labels()
     plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
-    plt.ylabel("Exp. recom."+perc)
+    plt.ylabel('Exp. recom.'+perc)
     plt.tick_params(axis='x', rotation=45)
-    plt.savefig(foredir+typedif+"_recommendations.png")
+    plt.savefig(foredir+typedif+'_recommendations.png')
     plt.clf()
     
 def gainlossplots(gainloss, plot_type):
     if 'rel' in plot_type: l_type='[%]'
     else: l_type = '[EUR]'
-    
     plt.axhline(0, color='black', linestyle='-')
     plt.bar(stocknm, gainloss, color= cgainloss)
     plt.ylabel('Gain/loss '+l_type)
-    plt.title(plot_type+' Gain/loss per stock')
+    plt.title(plot_type+' Gain/loss per stock (total'+str(totgainloss)+')')
     plt.tick_params(axis='x', rotation=45)
     plt.grid(axis='y', color='0.75', linestyle=':')
-    plt.savefig(foredir+plot_type.lower()+"_gain-loss.png")
+    plt.savefig(foredir+plot_type.lower()+'_gain-loss.png')
     plt.clf()
 
 today    = str(datetime.date(datetime.now()))
@@ -60,7 +59,7 @@ today    = str(datetime.date(datetime.now()))
 if __name__ == '__main__':
     stocknm = []
 
-    jsonDict  = open(act_info, "rb")
+    jsonDict  = open(act_info, 'rb')
     portfolio = json.load(jsonDict)
 
     stocknm  = np.array([])
@@ -86,8 +85,8 @@ if __name__ == '__main__':
     reco_wi = np.array([])
 
     for stock_id in portfolio:
-        if "ETF" in portfolio[stock_id]["productType"]:
-            ETF_info = portfolio[stock_id]["productType"]
+        if 'ETF' in portfolio[stock_id]['productType']:
+            ETF_info = portfolio[stock_id]['productType']
             continue 
         stocknm  = np.append(stocknm , portfolio[stock_id][u'symbol'])
         act_val  = np.append(act_val , portfolio[stock_id][u'act_val'])
@@ -125,6 +124,7 @@ if __name__ == '__main__':
     exp_maxreldif = 100*exp_maxdif/act_val
     exp_relran    = np.array(list(zip(exp_minreldif, exp_maxreldif))).T
     exp_ran       = np.array(zip(exp_mindif, exp_maxdif)).T
+    totgainloss   = round(sum(gainloss),3) 
 
     colors     = [ 'r' if i < 0 else 'g' for i in difference]
     cgainloss  = [ 'r' if i < 0 else 'g' for i in gainloss]
@@ -137,18 +137,18 @@ if __name__ == '__main__':
     gainlossplots(gainloss/(0.01*BEP*size), 'Relative')
     gainlossplots(gainloss                , 'Total')
     #Different pltos
-    diff_plots(act_val   , exp_val   , BEP   ,ran_52   , "Absolute")
-    diff_plots(act_relval, exp_relval, BEP   ,relran_52, "Relative")
-    diff_plots(act_relBEP, exp_relBEP, relBEP,BEPran_52, "relative BEP")
+    diff_plots(act_val   , exp_val   , BEP   ,ran_52   , 'Absolute')
+    diff_plots(act_relval, exp_relval, BEP   ,relran_52, 'Relative')
+    diff_plots(act_relBEP, exp_relBEP, relBEP,BEPran_52, 'relative BEP')
     #Recommendation plots
-    makerecoplots(sell, underw, hold, overw, buy, "Absolute")
-    makerecoplots(100*sell/nrecos, 100* underw/nrecos, 100*hold/nrecos, 100*overw/nrecos, 100*buy/nrecos, "Relative")
+    makerecoplots(sell, underw, hold, overw, buy, 'Absolute')
+    makerecoplots(100*sell/nrecos, 100* underw/nrecos, 100*hold/nrecos, 100*overw/nrecos, 100*buy/nrecos, 'Relative')
 
-    plt.scatter(stocknm, reco_wi, c=reco_wi, cmap="RdYlGn_r")
+    plt.scatter(stocknm, reco_wi, c=reco_wi, cmap='RdYlGn_r')
     plt.clim(1,5)
     plt.grid(color='0.75', linestyle=':')
-    plt.title("Buy/sell consensus (1-5) per stock")
+    plt.title('Buy/sell consensus (1-5) per stock')
     plt.tick_params(axis='x', rotation=45)
-    plt.savefig(foredir+"average_recommendation.png")
+    plt.savefig(foredir+'average_recommendation.png')
 
     

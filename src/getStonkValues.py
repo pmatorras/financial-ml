@@ -17,13 +17,13 @@ def printValues(stock, stocksym, BEP, act_val, exp_val, exp_max, exp_min,  exp_p
     print ""
 
 def makeSoup(link):
-    request = requests.get(link, headers=headers)
+    request = requests.get(link, headers=headers["2"])
     return    BeautifulSoup(request.text,"lxml")
 
 
 def getStocks(stocks, type_i):
     for stocksym in stocks.keys():
-        #if "SAN" not in stocksym: continue
+        print stocksym
         json_i  = jsonStocks[symb_isin[stocksym]]
         BEP     = str(json_i["BEP"])
         if type_i.lower() in ["esp", "cnn", "wsj"]:  stockType   = type_i
@@ -50,7 +50,7 @@ def getStocks(stocks, type_i):
             hist_ran   = reco_info.find(class_="cr_data_collection cr_charts_info").findAll(class_="data_data")
             prices     = reco_info.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
             reco_table = reco_info.find(class_="cr_analystRatings cr_data module" ).find(class_="cr_dataTable").findAll(class_="data_data")
-            
+            print  hist_ran, link
             vol_1    = getBetween(str(hist_ran[0]), ">"    , "<"     ).replace(',','')
             vol_52   = getBetween(str(hist_ran[1]), ">"    , "<"     ).replace(',','')
             ran_1    = getBetween(str(hist_ran[2]), ">"    , "<"     ).split('-')
