@@ -25,7 +25,7 @@ The stock plotter drawStonks.py requires the following dependencies:
 	pip install plotly	     
 	pip install yfinance
 	pip install -U Kaleido
-
+	pip install currencyconverter
 
 
 Two different plotting options are currently available:
