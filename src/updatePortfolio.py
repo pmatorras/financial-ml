@@ -20,7 +20,7 @@ def getLinksGoogle(site, stock, recom):
     else:
         if "FR" in isin_i: isin_i='XE'
         query = site+ symb_i+" "+ name_i+" "+isin_i+" "+recom
-    print "Stock", BWhite+symb_i+Color_Off+",\t query:\n", query
+    print "Stock", BWhite+symb_i+Colour_Off+",\t query:\n", query
     loopqueries(query,recom,links)
     
     if len(links) == 0 :

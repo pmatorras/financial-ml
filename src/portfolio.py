@@ -1,6 +1,5 @@
-#from getfirst.py import search
-execfile('getfirst.py')
-from variables    import *
+from search_google import search
+from variables     import *
 
 
 if __name__ == '__main__':
@@ -30,7 +29,7 @@ if __name__ == '__main__':
     print script_run
     for script in script_run:
         print "Processing "+script
-        if "update" in script: from colours import Color_Off, BWhite
+        if "update" in script: from colours import Colour_Off, BWhite
         execfile(srcdir+script)
 
 
