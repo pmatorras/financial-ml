@@ -5,8 +5,6 @@ from bs4                import BeautifulSoup
 from datetime           import datetime
 from currency_converter import CurrencyConverter
 
-CRED    = '\033[91m'
-CEND    = '\033[0m'
 headers = {"1": {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0'},
            "2": {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0'}}
 srcdir  = os.getcwd()+'/'+os.path.dirname(sys.argv[0])

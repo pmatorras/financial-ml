@@ -1,14 +1,12 @@
 
-def makeSoup(link):
-    print link
-    print headers["2"]
-    request   = requests.get(link, headers=headers["2"])
+def makeSoup(link,i):
+    request   = requests.get(link, headers=headers[i])
     return  BeautifulSoup(request.text,"lxml")
 
 
 
 def loopqueries(query,recom,links):
-    for j in search(query, tld='com', num =1, stop=1, pause =1):
+    for j in search(query, num_results =0):
         if recom.lstrip() not in j: continue 
         links.append(j)
 
@@ -22,8 +20,9 @@ def getLinksGoogle(site, stock, recom):
     else:
         if "FR" in isin_i: isin_i='XE'
         query = site+ symb_i+" "+ name_i+" "+isin_i+" "+recom
-    print "Stock", symb_i, ", query:\n", query
+    print "Stock", BWhite+symb_i+Color_Off+",\t query:\n", query
     loopqueries(query,recom,links)
+    
     if len(links) == 0 :
         query = site + symb_i + recom 
         loopqueries(query,recom, links)

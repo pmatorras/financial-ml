@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from variables import *
-
+from colours   import Color_Off, Red, Green, Blue, Yellow
 currencies = {
     "$"      : "USD",
     u"\u20ac": "EUR", 
@@ -36,13 +36,13 @@ def getBetween(string, before, after, curr_i = None, curr_f = None, ref= -1 ):
     return split
 
 def printValues(stock, stocksym, BEP, act_val, exp_val, exp_max, exp_min,  exp_perc, nrecos, nmonths, curr_i):
-    col_ini = CEND
-    if   "-" in str(exp_perc) or exp_perc<0 : col_ini = '\033[31m'
-    elif "+" in str(exp_perc) or exp_perc>0 : col_ini =  '\033[32m'
+    col_ini = Color_Off
+    if   "-" in str(exp_perc) or exp_perc<0 : col_ini = Red
+    elif "+" in str(exp_perc) or exp_perc>0 : col_ini = Green
     if float(exp_perc)>0: exp_perc = "+"+str(float(exp_perc))
-    col_end = CEND
+    col_end = Color_Off
     print stock, "["+stocksym+"]"
-    print "current value:", '\033[34m'+act_val+curr_i+col_end, "\t with BEP:,", '\033[34m'+BEP+curr_i+col_end
+    print "current value:", Blue+act_val+curr_i+col_end, "\t with BEP:,", Yellow+BEP+curr_i+col_end
     print "expected value in" ,nmonths, "months:", exp_val+curr_i, "all", nrecos, "analysis fall within ["+exp_min+curr_i+","+exp_max+curr_i+"]"
     print "Current expected gain:", col_ini+str(exp_perc)+"%"+col_end
     print ""

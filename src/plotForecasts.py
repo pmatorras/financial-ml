@@ -87,8 +87,10 @@ if __name__ == '__main__':
     for stock_id in portfolio:
         if 'ETF' in portfolio[stock_id]['productType']:
             ETF_info = portfolio[stock_id]['productType']
-            continue 
+            continue
+        if '.D' in portfolio[stock_id][u'symbol']: continue
         stocknm  = np.append(stocknm , portfolio[stock_id][u'symbol'])
+        print "stocknm", portfolio[stock_id][u'symbol']
         act_val  = np.append(act_val , portfolio[stock_id][u'act_val'])
         exp_val  = np.append(exp_val , portfolio[stock_id][u'exp_med'])
         exp_max  = np.append(exp_max , portfolio[stock_id][u'exp_max'])
