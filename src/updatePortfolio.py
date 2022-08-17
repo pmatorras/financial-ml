@@ -1,3 +1,4 @@
+from search_google import search
 
 def makeSoup(link,i):
     request   = requests.get(link, headers=headers[i])
@@ -6,6 +7,7 @@ def makeSoup(link,i):
 
 
 def loopqueries(query,recom,links):
+    print "query", query
     for j in search(query, num_results =0):
         if recom.lstrip() not in j: continue 
         links.append(j)

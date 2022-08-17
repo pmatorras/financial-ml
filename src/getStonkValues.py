@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from variables import *
+from updatePortfolio import *
 from colours   import Colour_Off, Red, Green, Blue, Yellow
 currencies = {
     "$"      : "USD",
@@ -14,27 +15,37 @@ c = CurrencyConverter()
 
 
 def convertCurrency(input_val, curr_i, curr_f, ref = 0 ):
-    value = float(input_val.replace(',',''))
-    if float(ref)>0:        
-        if "CNYto"+curr_f not in exch : exch["CNYto"+curr_f] = c.convert(1.0, "CNY", curr_f)
-        if "JPYto"+curr_f not in exch : exch["JPYto"+curr_f] = c.convert(1.0, "JPY", curr_f)  
-        yuan = value*exch["CNYto"+curr_f]
-        yen  = value*exch["JPYto"+curr_f]
-        if abs(np.log10(yuan/ref)) < abs(np.log10(yen/ref)) : return round(yuan,2)
-        else : return round(yen,2)
-    else:
-        key=curr_i+"to"+curr_f
-        if curr_i == curr_f: return round(value,2)
+    try:
+        value = float(input_val.replace(',',''))
+        if float(ref)>0:        
+            if "CNYto"+curr_f not in exch : exch["CNYto"+curr_f] = c.convert(1.0, "CNY", curr_f)
+            if "JPYto"+curr_f not in exch : exch["JPYto"+curr_f] = c.convert(1.0, "JPY", curr_f)  
+            yuan = value*exch["CNYto"+curr_f]
+            yen  = value*exch["JPYto"+curr_f]
+            if abs(np.log10(yuan/ref)) < abs(np.log10(yen/ref)) : return round(yuan,2)
+            else : return round(yen,2)
         else:
-            if key not in exch: exch[key] = c.convert(1.0, curr_i, curr_f)
-            return round(exch[key]*value,2)
+            key=curr_i+"to"+curr_f
+            if curr_i == curr_f: return round(value,2)
+            else:
+                if key not in exch: exch[key] = c.convert(1.0, curr_i, curr_f)
+                return round(exch[key]*value,2)
+    except ValueError:
+        print "value seems to not exist", input_val 
+        return -999
 
 
 def getBetween(string, before, after, curr_i = None, curr_f = None, ref= -1 ):
     split = string.split(before)[1].split(after)[0]
-    if curr_i and curr_f: split = convertCurrency(split, curr_i, curr_f, float(ref))
-    return split
-
+    #print curr_i, curr_f , string.split(before)[1].split(after)[0], float(split)
+    if curr_i and curr_f:
+        try:
+            return convertCurrency(split, curr_i, curr_f, float(ref))
+        except ValueError:
+            print "value seems to not exist", string
+            return -999
+    else:
+        return split
 def printValues(stock, stocksym, BEP, act_val, exp_val, exp_max, exp_min,  exp_perc, nrecos, nmonths, curr_i):
     col_ini = Colour_Off
     if   "-" in str(exp_perc) or exp_perc<0 : col_ini = Red
@@ -52,11 +63,14 @@ def makeSoup(link):
     return    BeautifulSoup(request.text,"lxml")
 
 
-def getStocks(stocks, type_i):
+def getStocks(stocks, type_i, doOnly='All'):
     for stocksym in stocks.keys():
         print stocksym
         if "." in stocksym: continue
-        #if "BABA" not in stocksym: continue
+        if 'All' not in doOnly and stocksym not in doOnly.split('_'): continue
+        #if "LOG" not in stocksym: continue
+
+
         json_i  = jsonStocks[symb_isin[stocksym]]
         BEP     = str(json_i["BEP"])
         curr_i  = str(json_i["currency"])
@@ -65,6 +79,7 @@ def getStocks(stocks, type_i):
         else:
             if "https" in stocks[stocksym][-1].lower():
                 link = stocks[stocksym][-1]
+                print stocksym,stocks[stocksym]
                 if "cincodias" in link: stockType = "esp"
                 elif     "cnn" in link: stockType = "cnn"
                 elif     "wsj" in link: stockType = "wsj"
@@ -84,10 +99,15 @@ def getStocks(stocks, type_i):
         if "wsj" in stockType:
             hist_ranP  = reco_info.find(class_="cr_curr_price")
             hist_ran   = reco_info.find(class_="cr_data_collection cr_charts_info").findAll(class_="data_data")
-            prices     = reco_info.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
+            try:
+                prices     = reco_info.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
+            except AttributeError:
+                print "try again"
+                reco_info = makeSoup(link)
+                prices     = reco_info.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
             reco_table = reco_info.find(class_="cr_analystRatings cr_data module" ).find(class_="cr_dataTable").findAll(class_="data_data")
-            print  link
-            ran_curr = getBetween(str(hist_ranP), "sup>", "</sup").replace('</','').decode('utf-8') 
+            ran_curr = str(hist_ranP).split("sup>")[1].split("</sup")[0].replace('</','').decode('utf-8') 
+            print link, ran_curr
             exp_curr = getBetween(str(prices[0]), "sup>", "</sup").replace('</','').decode('utf-8')
             act_curr = getBetween(str(prices[4]), "sup>", "</sup").replace('</','').decode('utf-8')
 
@@ -99,6 +119,7 @@ def getStocks(stocks, type_i):
             if "-" in currencies[act_curr] : ref_act  = float(getBetween(str(prices[1]  ), "/sup>", "</span").replace(',',''))
 
             vol_1    = getBetween(str(hist_ran[0]), ">"    , "<"     , currencies[ran_curr], curr_i, ref_hist)
+            print vol_1, currencies[ran_curr], hist_ran
             vol_52   = getBetween(str(hist_ran[1]), ">"    , "<"     , currencies[ran_curr], curr_i, ref_hist)
             ran_1    = getBetween(str(hist_ran[2]), ">"    , "<"     ).split('-')
             ran_52   = getBetween(str(hist_ran[3]), ">"    , "<"     ).split('-')
@@ -111,7 +132,19 @@ def getStocks(stocks, type_i):
             exp_med  = getBetween(str(prices[1]  ), "/sup>", "</span", currencies[exp_curr], curr_i, ref_exp)
             exp_avg  = getBetween(str(prices[3]  ), "/sup>", "</span", currencies[exp_curr], curr_i, ref_exp)
             act_val  = getBetween(str(prices[4]  ), "/sup>", "</span", currencies[act_curr], curr_i, ref_act)
-            
+            print act_val
+            if "PRX" in stocksym:
+                continue
+                link2 = []
+                recom = " research-ratings"
+                loopqueries("site:https://www.wsj.com/market-data/quotes/ PROSY"+recom , recom, link2)
+                print "other link", link2
+                reco_info2 = makeSoup(link2)
+                prices2    = reco_info2.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
+                act_val2   = getBetween(str(prices2[4]  ), "/sup>", "</span")
+                print act_val, act_val2
+                #exit()
+
             #exp_perc = round(100*(exp_med-act_val)/act_val,2)
             
             recos    = []
@@ -120,7 +153,8 @@ def getStocks(stocks, type_i):
             nrecos = sum(recos)
 
         elif "esp" in stockType:
-            dataset     = reco_info.text.split("var barChartData =")[1].split('};')[0]
+            dataset     = reco_info.find(class_="p-objetivo estirar").find('script', type='text/javascript').string
+            #dataset     = reco_info.text.split("var barChartData =")[1].split('};')[0]
             histo_table = reco_info.text.split("Tendencia de las recomendaciones")[1].split("*La")[0]
             stock_info  = makeSoup(link.replace('recomendaciones/', '')).find(class_="tabla-contenedor__interior").text.split('<tr>')[0].replace('\n', ' ')
 
@@ -162,7 +196,11 @@ def getStocks(stocks, type_i):
         printValues(stock, stocksym, BEP,str(act_val), str( exp_med), str( exp_max), str( exp_min), str( exp_perc), str( nrecos), str( nmonths), symb_i)
         
 if __name__ == '__main__':
-
+    usage  = 'usage: %prog [options]'
+    parser = optparse.OptionParser(usage)
+    parser.add_option('-o'    , dest='only', help='Only run these symbs (split by _)', default='All')
+    (opt, args) = parser.parse_args()
+    
     jsonFile   = open(full_port, "rb")
     jsonStocks = json.load(jsonFile)
     symb_isin  = {}
@@ -175,7 +213,7 @@ if __name__ == '__main__':
 
     pickleDict.close()
 
-    getStocks(portfolio, "multiple")
+    getStocks(portfolio, "multiple", opt.only)
     #save to json                                              
     with open(act_info, 'w') as f:
         json.dump(jsonStocks, f, indent=4)

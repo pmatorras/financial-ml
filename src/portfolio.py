@@ -1,4 +1,3 @@
-from search_google import search
 from variables     import *
 
 
