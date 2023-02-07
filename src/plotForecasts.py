@@ -89,7 +89,8 @@ if __name__ == '__main__':
     nrecos  = np.array([])
     reco_wi = np.array([])
 
-    for stock_id in portfolio:
+    portfolio_or = (sorted(portfolio, key=lambda x: (portfolio[x][u'symbol'])))
+    for stock_id in portfolio_or:
         if 'ETF' in portfolio[stock_id]['productType']:
             ETF_info = portfolio[stock_id]['productType']
             continue

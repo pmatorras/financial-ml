@@ -1,4 +1,4 @@
-
+from requests.exceptions import HTTPError
 if __name__ == '__main__':
     
     #Retrieve username and pasword from config file
@@ -12,14 +12,26 @@ if __name__ == '__main__':
                  'password': CONFIG['password'],
                  'isPassCodeReset': False,
                  'isRedirectToMobile': False}
-    header    = {'content-type': 'application/json'}
+    header    = {
+        'content-type': 'application/json',
+        'User-agent': 'Mozilla/5.0'}
     rlogin    = requests.post(URL_LOGIN, headers=header, data=json.dumps(payload))
     sessionID = rlogin.json()["sessionId"]
-
+    print sessionID
     # get int account
     URL_CLIENT = 'https://trader.degiro.nl/pa/secure/client'
     payload    = {'sessionId': sessionID}
-    rclient    = requests.get(URL_CLIENT, params=payload)
+    proxies = {
+        "http": None,
+        "https": None,
+    }
+    try:
+        session = requests.Session()
+        session.trust_env= False
+        rclient    = session.get(URL_CLIENT, params=payload, proxies=proxies, headers=header)
+        rclient.raise_for_status() 
+    except HTTPError as e:
+        print 'error ocurred', e
     intAccount = rclient.json()["data"]["intAccount"]
 
     #Retrieve data
@@ -33,7 +45,7 @@ if __name__ == '__main__':
                'historicalOrders': 0,
                'transactions': 0,
                'alerts': 0}
-    rcash = requests.get(URL, params=payload)
+    rcash = requests.get(URL, params=payload, headers=header)
     data  = rcash.json()
 
     # get cashfund

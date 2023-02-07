@@ -2,6 +2,7 @@
 from variables import *
 from updatePortfolio import *
 from colours   import Colour_Off, Red, Green, Blue, Yellow
+import random, time
 currencies = {
     "$"      : "USD",
     u"\u20ac": "EUR", 
@@ -59,7 +60,8 @@ def printValues(stock, stocksym, BEP, act_val, exp_val, exp_max, exp_min,  exp_p
     print ""
 
 def makeSoup(link):
-    request = requests.get(link, headers=headers["2"])
+    rand_int = str(random.randint(1,2))
+    request  = requests.get(link, headers=headers["2"])
     return    BeautifulSoup(request.text,"lxml")
 
 
@@ -68,7 +70,7 @@ def getStocks(stocks, type_i, doOnly='All'):
         print stocksym
         if "." in stocksym: continue
         if 'All' not in doOnly and stocksym not in doOnly.split('_'): continue
-        #if "LOG" not in stocksym: continue
+        #if "VOW3" not in stocksym: continue
 
 
         json_i  = jsonStocks[symb_isin[stocksym]]
@@ -102,7 +104,8 @@ def getStocks(stocks, type_i, doOnly='All'):
             try:
                 prices     = reco_info.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
             except AttributeError:
-                print "try again"
+                print "try again in 3 seconds"
+                time.sleep(3)
                 reco_info = makeSoup(link)
                 prices     = reco_info.find(class_="cr_data rr_stockprice module"     ).findAll(class_="data_data")
             reco_table = reco_info.find(class_="cr_analystRatings cr_data module" ).find(class_="cr_dataTable").findAll(class_="data_data")
@@ -124,9 +127,10 @@ def getStocks(stocks, type_i, doOnly='All'):
             ran_1    = getBetween(str(hist_ran[2]), ">"    , "<"     ).split('-')
             ran_52   = getBetween(str(hist_ran[3]), ">"    , "<"     ).split('-')
             min_1    = convertCurrency(ran_1[0] , currencies[ran_curr], curr_i, ref_hist)
-            max_1    = convertCurrency(ran_1[1] , currencies[ran_curr], curr_i, ref_hist)
+            max_1    = convertCurrency(ran_1[-1] , currencies[ran_curr], curr_i, ref_hist)
             min_52   = convertCurrency(ran_52[0], currencies[ran_curr], curr_i, ref_hist)
-            max_52   = convertCurrency(ran_52[1], currencies[ran_curr], curr_i, ref_hist)
+            print "gomax"
+            max_52   = convertCurrency(ran_52[-1], currencies[ran_curr], curr_i, ref_hist)
             exp_max  = getBetween(str(prices[0]  ), "/sup>", "</span", currencies[exp_curr], curr_i, ref_exp)
             exp_min  = getBetween(str(prices[2]  ), "/sup>", "</span", currencies[exp_curr], curr_i, ref_exp)
             exp_med  = getBetween(str(prices[1]  ), "/sup>", "</span", currencies[exp_curr], curr_i, ref_exp)
@@ -216,4 +220,5 @@ if __name__ == '__main__':
     getStocks(portfolio, "multiple", opt.only)
     #save to json                                              
     with open(act_info, 'w') as f:
-        json.dump(jsonStocks, f, indent=4)
+        #json.dump(jsonStocks, f, indent=4)
+        json.dump(sorted(portfolio, key=lambda x: (portfolio[x][u'symbol'])), f, indent=4)

@@ -58,6 +58,7 @@ if __name__ == '__main__':
         stocks_csv[portfolio[entry]["symbol"]] =  [portfolio[entry]["name"], portfolio[entry]["isin"]]
 
         if "ES" in portfolio[entry]["isin"]:
+            print portfolio[entry]
             links = getLinksGoogle("site:cincodias.elpais.com/mercados/empresas/ ", portfolio[entry], " recomendaciones")
             stocks_csv[portfolio[entry]["symbol"]].append(links[0])
         else: 

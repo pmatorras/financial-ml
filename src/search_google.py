@@ -9,9 +9,9 @@ def search(term, num_results=10, lang="en", proxy=None):
 
     def fetch_results(search_term, number_results, language_code):
         escaped_search_term = search_term.replace(' ', '+')
-
-        google_url = 'https://www.google.com/search?q={}&num={}&hl={}'.format(escaped_search_term, number_results+1,
-                                                                              language_code)
+        print escaped_search_term
+        #exit()
+        google_url = u'https://www.google.com/search?q={}&num={}&hl={}'.format(escaped_search_term, number_results+1, language_code)
         proxies = None
         if proxy:
             if proxy[:5]=="https":
