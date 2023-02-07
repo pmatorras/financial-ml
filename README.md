@@ -17,6 +17,8 @@ Can be ran through portfolio.py, with the following options:
 
 Run getStonkValues.py (Currently no options avaialble)
 
+	-o: Only the mentionned symbol (mainly for testing purposes)	     
+
 
 ## 3. Plot the information: 
 
