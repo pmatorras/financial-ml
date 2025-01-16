@@ -18,18 +18,19 @@ if __name__ == '__main__':
     elif opt.download : script_run = [down_name]
     elif opt.update   : script_run = [upda_name]
     else:
-        print "no running option set, please run either:"
-        print "-d to download portfolio \n-u to update portfolio info\n-b for both"
+        print ( "no running option set, please run either:")
+        print ("-d to download portfolio \n-u to update portfolio info\n-b for both")
         exit()
     onlySymbs = []
     doOnly    = opt.only
     if opt.only:
         onlySymbs = opt.only.split('_')
-    print script_run
+    print (script_run)
     for script in script_run:
-        print "Processing "+script
+        print ("Processing "+script, os.path.join(srcdir, script))
         if "update" in script: from colours import Colour_Off, BWhite
-        execfile(srcdir+script)
+        exec(open(os.path.join(srcdir, script)).read())
+
 
 
 

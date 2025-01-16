@@ -9,7 +9,7 @@ def search(term, num_results=10, lang="en", proxy=None):
 
     def fetch_results(search_term, number_results, language_code):
         escaped_search_term = search_term.replace(' ', '+')
-        print escaped_search_term
+        print (escaped_search_term)
         #exit()
         google_url = u'https://www.google.com/search?q={}&num={}&hl={}'.format(escaped_search_term, number_results+1, language_code)
         proxies = None

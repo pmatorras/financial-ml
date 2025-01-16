@@ -2,7 +2,8 @@ from requests.exceptions import HTTPError
 if __name__ == '__main__':
     
     #Retrieve username and pasword from config file
-    with open(srcdir+'../cfg/config', 'r') as configFile:
+    config_path = os.path.join(srcdir, "..", "cfg", "config")
+    with open(config_path) as configFile:
         CONFIG = json.load(configFile)
 
 
@@ -16,8 +17,9 @@ if __name__ == '__main__':
         'content-type': 'application/json',
         'User-agent': 'Mozilla/5.0'}
     rlogin    = requests.post(URL_LOGIN, headers=header, data=json.dumps(payload))
+    print(rlogin)
     sessionID = rlogin.json()["sessionId"]
-    print sessionID
+    print(sessionID)
     # get int account
     URL_CLIENT = 'https://trader.degiro.nl/pa/secure/client'
     payload    = {'sessionId': sessionID}
@@ -31,7 +33,7 @@ if __name__ == '__main__':
         rclient    = session.get(URL_CLIENT, params=payload, proxies=proxies, headers=header)
         rclient.raise_for_status() 
     except HTTPError as e:
-        print 'error ocurred', e
+        print('error ocurred', e)
     intAccount = rclient.json()["data"]["intAccount"]
 
     #Retrieve data
