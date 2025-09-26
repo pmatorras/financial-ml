@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stonks"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas",
+  "yfinance",
+  "requests",
+  "pyarrow",
+  "scikit-learn",
+]
+
+[project.scripts]
+stonks-store = "stonks.store_info:main"
+stonks-train = "stonks.train:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
