@@ -11,7 +11,18 @@ import common
 
 
 
-px_m = pd.read_csv(common.SP500_MARKET_FILE, index_col=0, parse_dates=True)
+px_all = (pd.read_csv(common.SP500_MARKET_FILE, index_col=0, parse_dates=True)
+            .apply(pd.to_numeric, errors="coerce")
+            .sort_index())
+if "SPY" in px_all.columns:
+    spy = px_all["SPY"]
+    px_m = px_all.drop(columns=["SPY"])
+else:
+    px_m = px_all
+    # Optional fallback: fetch SPY and align monthly
+    import yfinance as yf
+    spy = yf.download("SPY", interval="1mo", auto_adjust=True, progress=False)["Close"].reindex(px_m.index).ffill()
+
 px_m = px_m.apply(pd.to_numeric, errors="coerce")
 px_m = px_m.sort_index()
 ret_1m = px_m.pct_change(1) #1 month change
@@ -28,8 +39,13 @@ if len(input_keys) != len(input_vars):
 feat = pd.concat(input_vars, axis=1, keys=input_keys)
 
 # Label: 12m forward total return > 0
-fwd_12m = px_m.pct_change(12).shift(-12)
-y = (fwd_12m > 0).astype(int)
+stock_fwd12 = px_m.pct_change(12).shift(-12)     # stock forward 12m return
+spy_fwd12   = spy.pct_change(12).shift(-12)      # SPY forward 12m return (Series)
+excess_fwd12 = stock_fwd12.sub(spy_fwd12, axis=0)  # broadcast subtract by row
+
+# Classification label: excess > 0
+y = (excess_fwd12 > 0).astype(int)
+
 
 # Align and stack panel to long format
 feat_long = feat.stack(level=1,future_stack=True)
@@ -44,7 +60,8 @@ Y = df["y"].values
 dates = pd.to_datetime(df["date"])
 order = np.argsort(dates.values)
 X, Y = X[order], Y[order]
-tscv = TimeSeriesSplit(n_splits=5, gap=1)
+unique_dates = np.array(sorted(df["date"].unique()))
+tscv = TimeSeriesSplit(n_splits=5,test_size=24)
 
 models = {
     "logreg_l2": Pipeline([
@@ -60,9 +77,15 @@ models = {
 for name, pipe in models.items():
     aucs_test = []
     aucs_train = []
-    for train, test in tscv.split(X):
-        Xtrain, Xtest, Ytrain, Ytest = X[train], X[test], Y[train], Y[test]
-        # Baseline logistic
+    for tr_d, te_d in tscv.split(unique_dates):
+        train_dates = set(unique_dates[tr_d])
+        test_dates  = set(unique_dates[te_d])
+
+        tr_mask = df["date"].isin(train_dates).to_numpy()
+        te_mask = df["date"].isin(test_dates).to_numpy()
+
+        Xtrain, Xtest = X[tr_mask], X[te_mask]
+        Ytrain, Ytest = Y[tr_mask], Y[te_mask]
         pipe.fit(Xtrain, Ytrain)
         p_train = pipe.predict_proba(Xtrain)[:,1]
         p_test = pipe.predict_proba(Xtest)[:,1]
