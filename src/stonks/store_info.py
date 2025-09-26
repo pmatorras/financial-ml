@@ -23,14 +23,6 @@ def fetch_sp500_list(filepath, url, headers, force_download=False):
         df = pd.read_csv(filepath)
     return df
     #print(spx.head())
-def main():
-    spx = fetch_sp500_list(common.SP500NM_FILE, sp500_list_url, headers, args.newtable)
-    tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  # adjust BRK.B -> BRK-B, etc.
-    oldest_stocks = spx.sort_values('Date added').head(50)
-    # Get tickers for the oldest 50 firms
-    subset_tickers = oldest_stocks['Symbol'].tolist()
-    print(subset_tickers)
-    px = fetch_sp500_marketdata(common.SP500MARKET_FILE, subset_tickers, args.newinfo)
 def fetch_sp500_marketdata(filepath, tickers, force_download=False):
     if force_download or os.path.exists(filepath) is False:
         print("Downloading the sp500 list")
@@ -42,6 +34,15 @@ def fetch_sp500_marketdata(filepath, tickers, force_download=False):
         print(f"File {filepath} should be already available")
         sp500_data = pd.read_csv(filepath)
     return sp500_data
+def main():
+    spx = fetch_sp500_list(common.SP500NM_FILE, sp500_list_url, headers, args.newtable)
+    tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  # adjust BRK.B -> BRK-B, etc.
+    oldest_stocks = spx.sort_values('Date added').head(50)
+    # Get tickers for the oldest 50 firms
+    subset_tickers = oldest_stocks['Symbol'].tolist()
+    print(subset_tickers)
+    px = fetch_sp500_marketdata(common.SP500MARKET_FILE, subset_tickers, args.newinfo)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare GDP and Inflation for selected countries")
     parser.add_argument("-nt", "--newtable", action="store_true", help="Update sp500 table")    
