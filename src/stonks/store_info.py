@@ -26,8 +26,9 @@ def fetch_sp500_list(filepath, url, headers, force_download=False):
 def fetch_sp500_marketdata(filepath, tickers, force_download=False):
     if force_download or os.path.exists(filepath) is False:
         print("Downloading the sp500 list")
-        sp500_data = yf.download(tickers, start="2005-01-01", interval="1mo", auto_adjust=True, progress=False)["Close"]
-        spy_data = yf.download("SPY", start="2005-01-01", interval="1mo", auto_adjust=True, progress=False)["Close"]
+        date_start="1995-01-01"
+        sp500_data = yf.download(tickers, start=date_start, interval="1mo", auto_adjust=True, progress=False)["Close"]
+        spy_data = yf.download("SPY", start=date_start, interval="1mo", auto_adjust=True, progress=False)["Close"]
         print("sp500_data", sp500_data, "SPY data", spy_data)
         sp500_data.to_csv(filepath)
         print(f"Saved to {filepath}")
@@ -39,17 +40,23 @@ def fetch_sp500_marketdata(filepath, tickers, force_download=False):
 def main():
     spx = fetch_sp500_list(common.SP500_NAMES_FILE, sp500_list_url, headers, args.newtable)
     tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
+
     oldest_stocks = spx.sort_values('Date added').head(50)
     # Get tickers for the oldest 50 firms for the test
     subset_tickers = oldest_stocks['Symbol'].tolist()
-    if "SPY" not in subset_tickers:
+    if "SPY" not in tickers:
+        tickers.append("SPY")
         subset_tickers.append("SPY")
-    print(subset_tickers)
-    px = fetch_sp500_marketdata(common.SP500_MARKET_FILE, subset_tickers, args.newinfo)
+    if args.test:
+        px = fetch_sp500_marketdata(common.SP500_MARKET_TEST, subset_tickers, args.newinfo)
+    else:
+        px = fetch_sp500_marketdata(common.SP500_MARKET_FILE, subset_tickers, args.newinfo)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare GDP and Inflation for selected countries")
     parser.add_argument("-nt", "--newtable", action="store_true", help="Update sp500 table")    
-    parser.add_argument("-ni", "--newinfo", action="store_true", help="Update sp500 financial information")    
+    parser.add_argument("-ni", "--newinfo", action="store_true", help="Update sp500 financial information") 
+    parser.add_argument("-t" , "--test"   , action="store_true", help="Test on a smaller subset of 50")    
+   
     args = parser.parse_args()
     main()
