@@ -34,11 +34,12 @@ def fetch_sp500_marketdata(filepath, tickers, force_download=False):
         print(f"File {filepath} should be already available")
         sp500_data = pd.read_csv(filepath)
     return sp500_data
+
 def main():
     spx = fetch_sp500_list(common.SP500NM_FILE, sp500_list_url, headers, args.newtable)
-    tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  # adjust BRK.B -> BRK-B, etc.
+    tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
     oldest_stocks = spx.sort_values('Date added').head(50)
-    # Get tickers for the oldest 50 firms
+    # Get tickers for the oldest 50 firms for the test
     subset_tickers = oldest_stocks['Symbol'].tolist()
     print(subset_tickers)
     px = fetch_sp500_marketdata(common.SP500MARKET_FILE, subset_tickers, args.newinfo)
