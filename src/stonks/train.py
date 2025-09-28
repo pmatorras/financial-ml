@@ -7,14 +7,31 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 import yfinance as yf
-import common
+from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR
 import argparse
 
+models = {
+    "logreg_l2": Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression(max_iter=2000, C=1.0, class_weight="balanced"))
+    ]),
+    "logreg_l1": Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression(solver="liblinear", penalty="l1",
+                                C=0.5, max_iter=5000, class_weight="balanced"))
+    ])
+    ,
+    "rf": Pipeline([
+        ("scaler", "passthrough"),  # trees don't need scaling
+        ("clf", RandomForestClassifier(n_estimators=100, max_depth=None,
+                                    min_samples_leaf=5, n_jobs=-1, class_weight="balanced_subsample"))
+    ])
+}
 
-def main():
-    csv_file = common.SP500_MARKET_TEST if args.test else common.SP500_MARKET_FILE
+def train(args):
+    csv_file = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
     print("opening", csv_file)
-    px_all = (pd.read_csv(common.SP500_MARKET_FILE, index_col=0, parse_dates=True)
+    px_all = (pd.read_csv(csv_file, index_col=0, parse_dates=True)
                 .apply(pd.to_numeric, errors="coerce")
                 .sort_index())
     if "SPY" in px_all.columns:
@@ -73,23 +90,7 @@ def main():
     unique_dates = np.array(sorted(df["date"].unique()))
     tscv = TimeSeriesSplit(n_splits=5,test_size=36)
 
-    models = {
-        "logreg_l2": Pipeline([
-            ("scaler", StandardScaler()),
-            ("clf", LogisticRegression(max_iter=2000, C=1.0, class_weight="balanced"))
-        ]),
-        "logreg_l1": Pipeline([
-            ("scaler", StandardScaler()),
-            ("clf", LogisticRegression(solver="liblinear", penalty="l1",
-                                    C=0.5, max_iter=5000, class_weight="balanced"))
-        ])
-        ,
-        "rf": Pipeline([
-            ("scaler", "passthrough"),  # trees don't need scaling
-            ("clf", RandomForestClassifier(n_estimators=100, max_depth=None,
-                                        min_samples_leaf=5, n_jobs=-1, class_weight="balanced_subsample"))
-        ])
-    }
+
     pred_rows = []
     for name, pipe in models.items():
         aucs_test = []
@@ -128,11 +129,11 @@ def main():
         print("Baseline logistic train AUC ("+name+"):", np.round(aucs_train, 3).tolist())
         print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, 3).tolist())
     pred_df = pd.concat(pred_rows, ignore_index=True)
-    predpath = common.DATA_DIR/"oof_predictions.csv"
+    predpath = DATA_DIR/"oof_predictions.csv"
     pred_df.to_csv(predpath, index=False)
 
 
-
+'''
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare GDP and Inflation for selected countries")
     parser.add_argument("-nt", "--newtable", action="store_true", help="Update sp500 table")    
@@ -141,3 +142,4 @@ if __name__ == "__main__":
    
     args = parser.parse_args()
     main()
+'''
