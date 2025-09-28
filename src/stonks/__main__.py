@@ -1,8 +1,4 @@
-import pandas as pd, numpy as np
-import yfinance as yf
-import requests, argparse, os
-from io import StringIO
-import pandas as pd
+import argparse
 from .store_info import store_info
 from .train import train
 def main():
