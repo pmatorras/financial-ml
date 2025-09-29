@@ -4,10 +4,11 @@ import requests, argparse, os
 from io import StringIO
 import pandas as pd
 import warnings
-from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE
-sp500_list_url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
-def fetch_sp500_list(filepath, url, headers, force_download=False):
+
+def fetch_sp500_list(filepath, force_download=False, url=None, headers=None):
+    '''Download SP500 list of companies'''
     if force_download or os.path.getsize(filepath)<1:
         print("Downloading the sp500 list")
         response = requests.get(url, headers=headers)
@@ -25,11 +26,11 @@ def fetch_sp500_list(filepath, url, headers, force_download=False):
     return df
 
 def fetch_sp500_marketdata(filepath, tickers, force_download=False):
+    '''Use Yfinance api to download data for sp500 companies (and the SPYear return)'''
     if force_download or os.path.exists(filepath) is False:
         print("Downloading the sp500 list")
-        date_start="1995-01-01"
-        sp500_data = yf.download(tickers, start=date_start, interval="1mo", auto_adjust=True, progress=False)["Close"]
-        spy_data = yf.download("SPY", start=date_start, interval="1mo", auto_adjust=True, progress=False)["Close"]
+        sp500_data = yf.download(tickers, start=START_STORE_DATE, interval=DATA_INTERVAL, auto_adjust=True, progress=False)["Close"]
+        spy_data = yf.download("SPY", start=START_STORE_DATE, interval=DATA_INTERVAL, auto_adjust=True, progress=False)["Close"]
         print("sp500_data", sp500_data, "SPY data", spy_data)
         sp500_data.to_csv(filepath)
         print(f"Saved to {filepath}")
@@ -43,7 +44,7 @@ def add_SPY(tickers):
         tickers.append("SPY")
 
 def store_info(args):
-    spx = fetch_sp500_list(SP500_NAMES_FILE, sp500_list_url, headers, args.newtable)
+    spx = fetch_sp500_list(SP500_NAMES_FILE, args.newtable, SP500_LIST_URL, headers)
     all_tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
 
     if args.test:
