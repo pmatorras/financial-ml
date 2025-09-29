@@ -1,4 +1,3 @@
-# pip install requests pandas yfinance
 import time
 from io import StringIO
 import requests
@@ -7,29 +6,26 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
 import pandas as pd
-from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST
+from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS
 from .markets import fetch_sp500_list
+
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
 UA = "ResearchBot/1.0 (contact@example.com)"  
 BASE = "https://data.sec.gov"
 
-def session_with_retries():
-    s = requests.Session()
-    s.headers.update({"User-Agent": UA, "Accept-Encoding": "gzip, deflate"})
-    retry = Retry(total=5, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
-    s.mount("https://", HTTPAdapter(max_retries=retry))
-    return s
-
-sess = session_with_retries()
-
 def get_json(url, params=None, sleep=0.12):
+    '''Create a requests session, and fetch json data from the url'''
+    sess = requests.Session()
+    sess.headers.update({"User-Agent": UA, "Accept-Encoding": "gzip, deflate"})
+    retry = Retry(total=5, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
+    sess.mount("https://", HTTPAdapter(max_retries=retry))
     r = sess.get(url, params=params, timeout=30)
     r.raise_for_status()
     if sleep: time.sleep(sleep)
     return r.json()
 
-# Helper to extract one tag/unit into a tidy PIT series
 def extract_tag_pit(cf_json, taxonomy, tag, unit):
+    '''Extract one tag/unit into a PIT series'''
     try:
         facts = cf_json["facts"][taxonomy][tag]["units"][unit]
     except KeyError:
@@ -45,22 +41,14 @@ def extract_tag_pit(cf_json, taxonomy, tag, unit):
     # keep only dated facts
     return df[["period_end","filed","value","metric","unit"]].dropna(subset=["filed"])
 
-# Select a few common metrics and units
-targets = [
-    ("us-gaap","Assets","USD"),
-    ("us-gaap","Liabilities","USD"),
-    ("us-gaap","StockholdersEquity","USD"),
-    ("us-gaap","Revenues","USD"),
-    ("us-gaap","NetIncomeLoss","USD"),
-    ("us-gaap","EarningsPerShareDiluted","USD/share"),
-    ("us-gaap","CommonStockSharesOutstanding","shares"), #Careful with double counting this (see https://www.perplexity.ai/search/i-am-developing-a-framework-th-6QC.Sc1JS1GjJQBfELScNw#5)
-]
+
 def dropDuplicateInfo(_df, key_cols):
     '''Drop data when duplicated'''
     df_last = _df.sort_values(key_cols).drop_duplicates(subset=key_cols, keep="last").sort_values(key_cols).reset_index(drop=True)
     return df_last
 
 def fetch_facts_latest_for_cik(cik, ticker, targets):
+    '''Retrieve each fundamentals for each company, using the SEC data'''
     cf = get_json(f"{BASE}/api/xbrl/companyfacts/CIK{cik}.json")
     series = [extract_tag_pit(cf, *t) for t in targets]
     series_nonempty = [df for df in series if not df.empty]
@@ -77,13 +65,14 @@ def fetch_facts_latest_for_cik(cik, ticker, targets):
 
 
 def fundamentals(args):
+    '''Retrieve sp500 information from markets.py, and obtain the fundamentals for these'''
     df = fetch_sp500_list(SP500_NAMES_FILE, False)
     pairs = list(
         df.loc[:, ["CIK", "Symbol"]]
         .assign(CIK=lambda x: x["CIK"].astype(str).str.zfill(10))
         .to_records(index=False)
     )
-    # If NumPy recarray tuples are not desired, cast explicitly:
+
     universe = [ (cik, sym) for cik, sym in pairs ]
     fundamentals_file= SP500_FUNDA_FILE
     if args.test:
@@ -98,19 +87,19 @@ def fundamentals(args):
     for cik, ticker in universe:
         print(ticker)
         try:
-            df_i = fetch_facts_latest_for_cik(cik, ticker, targets)
+            df_i = fetch_facts_latest_for_cik(cik, ticker, FUNDAMENTAL_VARS)
             all_facts.append(df_i)
         except Exception as e:
             print(f"skip {cik} {ticker}: {e}")
 
     facts_latest_all = pd.concat(all_facts, ignore_index=True)
 
-    # Optional: deterministic ordering
+    # Sort
     facts_latest_all = facts_latest_all.sort_values(
         ["ticker","metric","unit","period_end","filed"]
     ).reset_index(drop=True)
 
-    # Write once to CSV
+    # Write to CSV
     print("Saving file to:", fundamentals_file)
     facts_latest_all.to_csv(fundamentals_file, index=False)
 
