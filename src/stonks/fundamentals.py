@@ -7,8 +7,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
 import pandas as pd
-from common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST
-
+from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST
+from .markets import fetch_sp500_list
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
 UA = "ResearchBot/1.0 (contact@example.com)"  
 BASE = "https://data.sec.gov"
@@ -75,64 +75,43 @@ def fetch_facts_latest_for_cik(cik, ticker, targets):
     facts_latest["ticker"] = ticker
     return facts_latest
 
-# Example CIK↔ticker list; in production, build from SEC company_tickers.json+
-def fetch_sp500_list(filepath, force_download=False, url=None, headers=None):
-    '''Download SP500 list of companies'''
-    if force_download or os.path.getsize(filepath)<1:
-        print("Downloading the sp500 list")
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Ensure we got a 200 OK
 
-        # Parse HTML content with pandas
-        tables = pd.read_html(StringIO(response.text))
-        df = tables[0]
-        df.to_csv(filepath)
-        print(f"Saved to {filepath}")
+def fundamentals(args):
+    df = fetch_sp500_list(SP500_NAMES_FILE, False)
+    pairs = list(
+        df.loc[:, ["CIK", "Symbol"]]
+        .assign(CIK=lambda x: x["CIK"].astype(str).str.zfill(10))
+        .to_records(index=False)
+    )
+    # If NumPy recarray tuples are not desired, cast explicitly:
+    universe = [ (cik, sym) for cik, sym in pairs ]
+    fundamentals_file= SP500_FUNDA_FILE
+    if args.test:
+        fundamentals_file = SP500_FUNDA_TEST
+        universe = [
+        ("0000066740","MMM"),
+        ("0000320193","AAPL"),
+        ("0000789019","MSFT"),
+        ]
+    print(fundamentals_file)
+    all_facts = []
+    for cik, ticker in universe:
+        print(ticker)
+        try:
+            df_i = fetch_facts_latest_for_cik(cik, ticker, targets)
+            all_facts.append(df_i)
+        except Exception as e:
+            print(f"skip {cik} {ticker}: {e}")
 
-    else:   
-        print(f"File {filepath} should be already available")
-        df = pd.read_csv(filepath)
-    return df
-df = fetch_sp500_list(SP500_NAMES_FILE, False)
-print(df)
-pairs = list(
-    df.loc[:, ["CIK", "Symbol"]]
-      .assign(CIK=lambda x: x["CIK"].astype(str).str.zfill(10))
-      .to_records(index=False)
-)
-# If NumPy recarray tuples are not desired, cast explicitly:
-universe = [ (cik, sym) for cik, sym in pairs ]
-fundamentals_file= SP500_FUNDA_FILE
-test=True
-if test:
-    fundamentals_file = SP500_FUNDA_TEST
-    universe = [
-    ("0000066740","MMM"),
-    ("0000320193","AAPL"),
-    ("0000789019","MSFT"),
-    ]
-print(fundamentals_file)
-all_facts = []
-for cik, ticker in universe:
-    print(ticker)
-    try:
-        df_i = fetch_facts_latest_for_cik(cik, ticker, targets)
-        all_facts.append(df_i)
-    except Exception as e:
-        print(f"skip {cik} {ticker}: {e}")
+    facts_latest_all = pd.concat(all_facts, ignore_index=True)
 
-facts_latest_all = pd.concat(all_facts, ignore_index=True)
+    # Optional: deterministic ordering
+    facts_latest_all = facts_latest_all.sort_values(
+        ["ticker","metric","unit","period_end","filed"]
+    ).reset_index(drop=True)
 
-# Optional: deterministic ordering
-facts_latest_all = facts_latest_all.sort_values(
-    ["ticker","metric","unit","period_end","filed"]
-).reset_index(drop=True)
-
-# Write once to CSV
-print("Saving file to:", fundamentals_file)
-print(facts_latest_all)
-exit()
-facts_latest_all.to_csv(fundamentals_file, index=False)
-print("Finished.")
+    # Write once to CSV
+    print("Saving file to:", fundamentals_file)
+    facts_latest_all.to_csv(fundamentals_file, index=False)
 
 
