@@ -24,15 +24,30 @@ It can also fetch fundamentals for each company from public filings and persist 
 
 ### Installation
 
-- Python dependencies used by the code include pandas, numpy, scikit-learn, yfinance, requests, and urllib3.
-- Install these packages in a virtual environment before running the commands below.
+- Requires Python ≥ 3.10; core dependencies are declared in pyproject.toml (pandas, numpy, scikit-learn, yfinance, requests, pyarrow).
+- Option A — Development (editable install): install the package from source so local changes are picked up.
+- Option B — Reproducible (pinned): install exact versions from Requirements.txt, then install the package.
+- It is recommended to create and activate a virtual environment and upgrade pip/setuptools before installing.
+- If console scripts are defined in pyproject, they will be available on PATH after installation.
 
-Example:
+Editable install:
 
 ```
-pip install pandas numpy scikit-learn yfinance requests urllib3
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -U pip setuptools wheel
+pip install -e .
 ```
 
+Reproducible install with pins:
+
+```
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -U pip setuptools wheel
+pip install -r Requirements.txt
+pip install -e .
+```
 
 ### Usage
 
@@ -41,7 +56,7 @@ The CLI supports flags to update the S\&P 500 list, download market data, run fu
 - Update symbols and prices, then train:
 
 ```
-python -m <package>.main -nt -ni --train
+python -m financial_ml -nt -ni --train
 ```
 
 Replace <package> with the actual package name that contains the modules shown here.
@@ -49,13 +64,13 @@ Replace <package> with the actual package name that contains the modules shown h
 - Fetch fundamentals for the full universe:
 
 ```
-python -m <package>.main -f
+python -m financial_ml -f
 ```
 
 - Run a quicker workflow on a 50-ticker subset:
 
 ```
-python -m <package>.main -nt -ni -f --test
+python -m financial_ml -nt -ni -f --test
 ```
 
 Flags summary:
