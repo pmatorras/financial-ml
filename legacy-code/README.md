@@ -1,4 +1,4 @@
-# Stonks
+# Financial Data
 Small framework that takes your portfolio from degiro, and gets the actual and expected values as well as the recommendations from either WSJ or cincodias (if spanish stock) public webpages.
 
 In order to get the framework running, change the config_template to your username and password, and rename it config.
