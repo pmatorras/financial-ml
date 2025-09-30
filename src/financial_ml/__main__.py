@@ -11,9 +11,16 @@ def main():
     parser.add_argument("-f", "--fundamentals"   , action="store_true", help="Download fundamentals")   
    
     args = parser.parse_args()
-    if args.newinfo or args.newtable: store_info(args)
-    if args.train: train(args)
-    if args.fundamentals: fundamentals(args)
+    print("Running the code")
+    if args.newinfo or args.newtable: 
+        print("Downloading market data...")
+        store_info(args)
+    if args.fundamentals: 
+        print("Downloading fundamentals")
+        fundamentals(args)
+    if args.train: 
+        print("Performing training")
+        train(args)
 
 
 

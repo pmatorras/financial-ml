@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 import yfinance as yf
-from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR
+from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST
 import argparse
 
 models = {
@@ -28,10 +28,10 @@ models = {
     ])
 }
 
-def train(args):
-    csv_file = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
-    print("opening", csv_file)
-    px_all = (pd.read_csv(csv_file, index_col=0, parse_dates=True)
+def load_market(args):
+    csv_filenm = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
+    print("opening", csv_filenm)
+    px_all = (pd.read_csv(csv_filenm, index_col=0, parse_dates=True)
                 .apply(pd.to_numeric, errors="coerce")
                 .sort_index())
     if "SPY" in px_all.columns:
@@ -42,12 +42,29 @@ def train(args):
         # Optional fallback: fetch SPY and align monthly
         import yfinance as yf
         spy = yf.download("SPY", interval="1mo", auto_adjust=True, progress=False)["Close"].reindex(px_m.index).ffill()
+    return px_m, spy
+def load_fundamentals(args):
+    csv_filenm = SP500_FUNDA_TEST if args.test else SP500_FUNDA_FILE
+    print("opening", csv_filenm)
+    f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"])
+    f["metric"] = f["metric"].astype("string")
+    print(f.keys())
+    f[["taxonomy","tag"]] = f["metric"].str.split("/", n=1, expand=True)
 
-    px_m = px_m.apply(pd.to_numeric, errors="coerce")
-    px_m = px_m.sort_index()
-    ret_1m = px_m.pct_change(1) #1 month change
-    ret_12m = px_m.pct_change(12) #change in 12 months
-    mom_12_1 = px_m.pct_change(12) - px_m.pct_change(1)  # simple momentum variant
+    targets = pd.DataFrame(FUNDAMENTAL_VARS, columns=["taxonomy","tag","unit"])
+    f_sel = f.merge(targets, on=["taxonomy","tag","unit"], how="inner")
+    print(f_sel.keys())
+    f_sel = f_sel.drop(columns=["taxonomy","tag"])
+    return f_sel
+def train(args):
+    fundamentals = load_fundamentals(args)
+    exit()
+    prices, spy_benchmark = load_market(args)
+    prices = prices.apply(pd.to_numeric, errors="coerce")
+    prices = prices.sort_index()
+    ret_1m = prices.pct_change(1) #1 month change
+    ret_12m = prices.pct_change(12) #change in 12 months
+    mom_12_1 = prices.pct_change(12) - prices.pct_change(1)  # simple momentum variant
     vol_3m = ret_1m.rolling(3).std() #volumes
     vol_12m = ret_1m.rolling(12).std()
 
@@ -59,9 +76,9 @@ def train(args):
     feat = pd.concat(input_vars, axis=1, keys=input_keys)
 
     # Label: 12m forward total return > 0
-    stock_fwd12 = px_m.pct_change(12).shift(-12)     # stock forward 12m return
-    spy_fwd12   = spy.pct_change(12).shift(-12)      # SPY forward 12m return (Series)
-    excess_fwd12 = stock_fwd12.sub(spy_fwd12, axis=0)  # broadcast subtract by row
+    stock_fwd12 = prices.pct_change(12).shift(-12)     # stock forward 12m return
+    spy_benchmark_fwd12   = spy_benchmark.pct_change(12).shift(-12)      # spy_benchmark forward 12m return (Series)
+    excess_fwd12 = stock_fwd12.sub(spy_benchmark_fwd12, axis=0)  # broadcast subtract by row
 
     # Classification label: excess > 0
     y = (excess_fwd12 > 0).astype(int)
