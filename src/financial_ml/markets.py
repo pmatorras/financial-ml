@@ -7,9 +7,9 @@ import warnings
 from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
 
-def fetch_sp500_list(filepath, force_download=False, url=None, headers=None):
+def fetch_sp500_list(filepath, args, url=None, headers=None):
     '''Download SP500 list of companies'''
-    if force_download or os.path.getsize(filepath)<1:
+    if args.newtable or os.path.getsize(filepath)<1:
         print("Downloading the sp500 list")
         response = requests.get(url, headers=headers)
         response.raise_for_status()  # Ensure we got a 200 OK
@@ -23,6 +23,9 @@ def fetch_sp500_list(filepath, force_download=False, url=None, headers=None):
     else:   
         print(f"File {filepath} should be already available")
         df = pd.read_csv(filepath)
+    if args.test: 
+        print("returning only test subset")
+        df=df.sort_values('Date added').head(50)
     return df
 
 def fetch_sp500_marketdata(filepath, tickers, force_download=False):
@@ -42,27 +45,12 @@ def add_SPY(tickers):
         warnings.warn(f"SPY is found in list!", UserWarning)
     else:
         tickers.append("SPY")
-
+    return tickers
 def store_info(args):
-    spx = fetch_sp500_list(SP500_NAMES_FILE, args.newtable, SP500_LIST_URL, headers)
-    all_tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
+    spx = fetch_sp500_list(SP500_NAMES_FILE, args, SP500_LIST_URL, headers)
+    tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
+    sp500_marketfile = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
+    all_tickers = add_SPY(tickers)
+    fetch_sp500_marketdata(sp500_marketfile, all_tickers, args.newinfo)
 
-    if args.test:
-        oldest_stocks = spx.sort_values('Date added').head(50)
-        subset_tickers = oldest_stocks['Symbol'].tolist()
-        add_SPY(subset_tickers)
-        fetch_sp500_marketdata(SP500_MARKET_TEST, subset_tickers, args.newinfo)
-    else:
-        add_SPY(all_tickers)
-        fetch_sp500_marketdata(SP500_MARKET_FILE, all_tickers, args.newinfo)
 
-'''
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Compare GDP and Inflation for selected countries")
-    parser.add_argument("-nt", "--newtable", action="store_true", help="Update sp500 table")    
-    parser.add_argument("-ni", "--newinfo", action="store_true", help="Update sp500 financial information") 
-    parser.add_argument("-t" , "--test"   , action="store_true", help="Test on a smaller subset of 50")    
-   
-    args = parser.parse_args()
-    main()
-'''

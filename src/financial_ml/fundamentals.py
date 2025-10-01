@@ -66,7 +66,7 @@ def fetch_facts_latest_for_cik(cik, ticker, targets):
 
 def fundamentals(args):
     '''Retrieve sp500 information from markets.py, and obtain the fundamentals for these'''
-    df = fetch_sp500_list(SP500_NAMES_FILE, False)
+    df = fetch_sp500_list(SP500_NAMES_FILE, args)
     pairs = list(
         df.loc[:, ["CIK", "Symbol"]]
         .assign(CIK=lambda x: x["CIK"].astype(str).str.zfill(10))
@@ -74,18 +74,14 @@ def fundamentals(args):
     )
 
     universe = [ (cik, sym) for cik, sym in pairs ]
-    fundamentals_file= SP500_FUNDA_FILE
-    if args.test:
-        fundamentals_file = SP500_FUNDA_TEST
-        universe = [
-        ("0000066740","MMM"),
-        ("0000320193","AAPL"),
-        ("0000789019","MSFT"),
-        ]
-    print(fundamentals_file)
+    print("universe", universe)
+    fundamentals_file= SP500_FUNDA_TEST if args.test else SP500_FUNDA_FILE
+    #universe = [("0000066740","MMM"), ("0000320193","AAPL"), ("0000789019","MSFT")]; fundamentals_file="test_funda.csv" #Save this in case an even shorter test
+    nstocks = len(universe)
+    print(f"Processing {nstocks} stocks")
     all_facts = []
-    for cik, ticker in universe:
-        print(ticker)
+    for i, (cik, ticker) in enumerate(universe, start=1):
+        print(f"{i}/{nstocks}: {ticker}")
         try:
             df_i = fetch_facts_latest_for_cik(cik, ticker, FUNDAMENTAL_VARS)
             all_facts.append(df_i)
