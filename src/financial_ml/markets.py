@@ -28,15 +28,32 @@ def fetch_sp500_list(filepath, args, url=None, headers=None):
         df=df.sort_values('Date added').head(50)
     return df
 
-def fetch_sp500_marketdata(filepath, tickers, force_download=False):
+def fetch_sp500_marketdata(filepath, tickers, force_download=False, monthly="end"):
     '''Use Yfinance api to download data for sp500 companies (and the SPYear return)'''
     if force_download or os.path.exists(filepath) is False:
-        print("Downloading the sp500 list")
-        sp500_data = yf.download(tickers, start=START_STORE_DATE, interval=DATA_INTERVAL, auto_adjust=True, progress=False)["Close"]
-        spy_data = yf.download("SPY", start=START_STORE_DATE, interval=DATA_INTERVAL, auto_adjust=True, progress=False)["Close"]
-        print("sp500_data", sp500_data, "SPY data", spy_data)
-        sp500_data.to_csv(filepath)
+        px = yf.download(tickers, start=START_STORE_DATE,
+                         interval=DATA_INTERVAL, auto_adjust=True,
+                         progress=False)["Close"]
+        spy = yf.download("SPY", start=START_STORE_DATE,
+                          interval=DATA_INTERVAL, auto_adjust=True,
+                          progress=False)["Close"]
+
+        if monthly == "end":
+            freq = "BM"  # business month-end
+            px_m = px.resample(freq).last()
+            spy_m = spy.resample(freq).last()
+        elif monthly == "start":
+            freq = "BMS"  # business month-start
+            px_m = px.resample(freq).first()
+            spy_m = spy.resample(freq).first()
+        else:
+            raise ValueError("monthly must be 'end' or 'start'")
+
+        # Save wide monthly prices; write SPY 12M returns alongside if desired
+        out = px_m.copy()
+        out.to_csv(filepath)
         print(f"Saved to {filepath}")
+        return px_m, spy_m
     else: 
         print(f"File {filepath} should be already available")
 
