@@ -9,7 +9,8 @@ def main():
     parser.add_argument("--test"   , action="store_true", help="Test on a smaller subset of 50")    
     parser.add_argument("--train"   , action="store_true", help="perform the training")
     parser.add_argument("-f", "--fundamentals"   , action="store_true", help="Download fundamentals")   
-   
+    parser.add_argument("-tf", "--trainfundamentals"   , action="store_true", help="Use also fundamentals to train")   
+
     args = parser.parse_args()
     print("Running the code")
     if args.newinfo or args.newtable: 

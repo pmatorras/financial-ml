@@ -56,20 +56,68 @@ def load_fundamentals(args):
     print(f_sel.keys())
     f_sel = f_sel.drop(columns=["taxonomy","tag"])
     return f_sel
+
+def to_monthly_ffill(df, maxdate=None, freq="BM"):
+    """
+    Minimal monthly duplication by period_end:
+    - Groups by (ticker, metric, unit)
+    - Resamples at monthly frequency on period_end
+    - Forward-fills to duplicate values between quarter ends
+    """
+    gcols = ["ticker", "metric", "unit"]
+    out = (
+        df.copy()
+          .assign(period_end=pd.to_datetime(df["period_end"], errors="coerce", utc=True).dt.tz_convert(None))
+          .sort_values(gcols + ["period_end"])
+          .set_index("period_end")
+          .groupby(gcols)["value"]
+          .resample(freq)
+          .ffill()
+          .rename("value")
+          .reset_index()
+    )
+
+    if maxdate is not None:
+        maxdate = pd.to_datetime(maxdate)
+        out = out[out["period_end"] <= maxdate]
+
+    return out
+
+def widenVariable(monthly, prices, m='us-gaap/Assets', u="USD"):
+    monthly["period_end"] = pd.to_datetime(monthly["period_end"], errors="coerce")
+
+    wide = (
+        monthly.loc[(monthly["metric"] == m) & (monthly["unit"] == u),
+                    ["period_end","ticker","value"]]
+            .pivot(index="period_end", columns="ticker", values="value")
+            .sort_index()
+    )
+
+    # Align to prices shape: same index and same columns order
+    wide = wide.reindex(index=prices.index, columns=prices.columns)
+    return wide
 def train(args):
-    fundamentals = load_fundamentals(args)
-    exit()
     prices, spy_benchmark = load_market(args)
     prices = prices.apply(pd.to_numeric, errors="coerce")
     prices = prices.sort_index()
-    ret_1m = prices.pct_change(1) #1 month change
-    ret_12m = prices.pct_change(12) #change in 12 months
-    mom_12_1 = prices.pct_change(12) - prices.pct_change(1)  # simple momentum variant
+    ret_1m = prices.pct_change(1, fill_method=None) #1 month change
+    ret_12m = prices.pct_change(12, fill_method=None) #change in 12 months
+    mom_12_1 = (1 + ret_12m) / (1 + ret_1m) - 1 #month on month momentum
     vol_3m = ret_1m.rolling(3).std() #volumes
     vol_12m = ret_1m.rolling(12).std()
 
+    ret_1m.to_csv("testret.csv")
+
     input_vars = [ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
     input_keys = ["r1", "r12", "mom121","vol3","vol12"]
+    if args.trainfundamentals:
+        fundamentals = load_fundamentals(args)
+        monthly = to_monthly_ffill(fundamentals, maxdate="2025-12-31", freq="BME")
+        m = "us-gaap/Assets"
+        u = "USD"
+        widen = widenVariable(monthly, prices, m, u)    
+        input_keys.append("fundamentals")
+        input_vars.append(monthly)
     if len(input_keys) != len(input_vars):
         print("keys and variables not the same size!")
         exit()
@@ -87,6 +135,8 @@ def train(args):
     # Align and stack panel to long format
     feat_long = feat.stack(level=1,future_stack=True)
     y_long = y.stack().rename("y")
+    print("ylong", y_long.index, feat_long.index)
+    exit()
     df = feat_long.join(y_long, how="inner").dropna()
 
     # Train/validation split: expanding window via TimeSeriesSplit
@@ -97,10 +147,12 @@ def train(args):
     df = df.sort_values("date")
     assert df["date"].is_monotonic_increasing, "Dates must be sorted ascending"  # guard
 
+    print(df)
     # Optional: ensure no NaNs remain in features/label before splitting
     df = df.dropna(subset=input_keys)
-    X = df[["r1","r12","mom121","vol3","vol12"]].to_numpy()
+    X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()
+
     dates = pd.to_datetime(df["date"])
     order = np.argsort(dates.values)
     X, Y = X[order], Y[order]

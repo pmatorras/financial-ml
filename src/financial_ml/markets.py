@@ -7,11 +7,11 @@ import warnings
 from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
 
-def fetch_sp500_list(filepath, args, url=None, headers=None):
+def fetch_sp500_list(filepath, args, url=SP500_LIST_URL, headers=headers):
     '''Download SP500 list of companies'''
     if args.newtable or os.path.getsize(filepath)<1:
         print("Downloading the sp500 list")
-        response = requests.get(url, headers=headers)
+        response = requests.get(SP500_LIST_URL, headers=headers)
         response.raise_for_status()  # Ensure we got a 200 OK
 
         # Parse HTML content with pandas
@@ -39,7 +39,7 @@ def fetch_sp500_marketdata(filepath, tickers, force_download=False, monthly="end
                           progress=False)["Close"]
 
         if monthly == "end":
-            freq = "BM"  # business month-end
+            freq = "BME"  # business month-end
             px_m = px.resample(freq).last()
             spy_m = spy.resample(freq).last()
         elif monthly == "start":
