@@ -176,10 +176,6 @@ def train(args):
         if args.debug: print(feat_long.keys(), feat_long["ROE"])
     y_long = y.stack().rename("y")
 
-    #y_long.to_csv("ylong.csv")
-    #feat_long.to_csv("feat_long.csv")
-
-
     df = feat_long.join(y_long, how="inner").dropna()
     require_non_empty(df, "feat_join_ylong")
     # Train/validation split: expanding window via TimeSeriesSplit
