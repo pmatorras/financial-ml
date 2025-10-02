@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 import yfinance as yf
-from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST
+from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR
 import argparse
 
 models = {
@@ -119,11 +119,14 @@ def train(args):
     vol_3m = ret_1m.rolling(3).std() #volumes
     vol_12m = ret_1m.rolling(12).std()
 
-    ret_1m.to_csv("testret.csv")
+    ret_1m.to_csv(TEST_DIR/"testret.csv")
 
-    input_vars = [ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
-    input_keys = ["r1", "r12", "mom121","vol3","vol12"]
+    input_vars = [prices, ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
+    market_keys = ["ClosePrice", "r1", "r12", "mom121","vol3","vol12"]
+    funda_keys = []
+    df_keys = market_keys.copy()          # safe copy for concat keys
     if args.trainfundamentals:
+        funda_keys = ["BookToMarket","ROE", "ROA", "NetMargin", "Leverage"]
         fundamentals = load_fundamentals(args)
         monthly = to_monthly_ffill(fundamentals, maxdate="2025-12-31", freq="BME")
         require_non_empty(monthly, "monthly")
@@ -133,22 +136,22 @@ def train(args):
             if args.debug:
                 print(f"processing: {fundamental} [{unit}]")
             widen = widenVariable(monthly, prices, fundamental, unit)    
-            widen.to_csv("widen.csv")
-            input_keys.append(fundamental)
+            widen.to_csv(TEST_DIR/"widen.csv")
+            df_keys.append(fundamental)
             input_vars.append(widen)
-
-    if len(input_keys) != len(input_vars):
+    input_keys=market_keys+funda_keys   
+    if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
         exit()
 
     if args.debug:
-        for k, df in zip(input_keys, input_vars):
+        for k, df in zip(df_keys, input_vars):
             print(k, type(df.index), df.index.min(), df.index.max(), df.shape)
-    feat = pd.concat(input_vars, axis=1, keys=input_keys)
-    feat.to_csv("feat.csv")
+    feat = pd.concat(input_vars, axis=1, keys=df_keys)
+    feat.to_csv(TEST_DIR/"feat.csv")
     
     # Label: 12m forward total return > 0
-    stock_fwd12 = prices.pct_change(12).shift(-12)     # stock forward 12m return
+    stock_fwd12 = prices.pct_change(12, fill_method=None).shift(-12)     # stock forward 12m return
     spy_benchmark_fwd12   = spy_benchmark.pct_change(12).shift(-12)      # spy_benchmark forward 12m return (Series)
     excess_fwd12 = stock_fwd12.sub(spy_benchmark_fwd12, axis=0)  # broadcast subtract by row
 
@@ -159,6 +162,18 @@ def train(args):
     # Align and stack panel to long format
     feat_long = feat.stack(level=1,future_stack=True)
     require_non_empty(feat_long, "feat_long")
+    if args.debug: print(feat_long.keys(), feat_long)
+    if args.trainfundamentals:
+        feat_long["MarketEquity"] = feat_long["ClosePrice"] - feat_long["us-gaap/CommonStockSharesOutstanding"]
+        feat_long["BookToMarket"] = feat_long["us-gaap/StockholdersEquity"] /feat_long["MarketEquity"]
+        eq = feat_long['us-gaap/StockholdersEquity'].astype(float)
+        feat_long['Equity_prev'] = eq.groupby(level=1).shift(1)
+        feat_long["AvgEquity"] = (feat_long['us-gaap/StockholdersEquity'] + feat_long['Equity_prev']) / 2.0
+        feat_long["ROE"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["AvgEquity"]
+        feat_long["ROA"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["us-gaap/Assets"]
+        feat_long["NetMargin"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["us-gaap/Revenues"]
+        feat_long["Leverage"]=feat_long["us-gaap/Liabilities"]-feat_long["us-gaap/Assets"]
+        if args.debug: print(feat_long.keys(), feat_long["ROE"])
     y_long = y.stack().rename("y")
 
     #y_long.to_csv("ylong.csv")
@@ -176,7 +191,9 @@ def train(args):
     assert df["date"].is_monotonic_increasing, "Dates must be sorted ascending"  # guard
     require_non_empty(df, "df_sorted")
     # Optional: ensure no NaNs remain in features/label before splitting
+
     df = df.dropna(subset=input_keys)
+    print("input keys", input_keys)
     X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()
 

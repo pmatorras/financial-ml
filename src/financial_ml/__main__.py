@@ -2,6 +2,7 @@ import argparse
 from .markets import store_info
 from .train import train
 from .fundamentals import fundamentals
+from .common import createFolders
 def main():
     parser = argparse.ArgumentParser(description="Compare GDP and Inflation for selected countries")
     parser.add_argument("-nt", "--newtable", action="store_true", help="Update sp500 table")    
@@ -14,6 +15,7 @@ def main():
 
     args = parser.parse_args()
     print("Running the code")
+    createFolders()
     if args.newinfo or args.newtable: 
         print("Downloading market data...")
         store_info(args)

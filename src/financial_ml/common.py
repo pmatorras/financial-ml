@@ -2,6 +2,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR /"data"
 FIGURE_DIR = ROOT_DIR / "figures"
+TEST_DIR = ROOT_DIR / "test"
 LOGS_DIR = ROOT_DIR / "logs"
 SP500_NAMES_FILE = DATA_DIR/"sp500_list.csv"
 SP500_MARKET_FILE = DATA_DIR/"sp500_market.csv"
@@ -24,6 +25,7 @@ FUNDAMENTAL_VARS = [
     ("us-gaap","CommonStockSharesOutstanding","shares"), #Careful with double counting this (see https://www.perplexity.ai/search/i-am-developing-a-framework-th-6QC.Sc1JS1GjJQBfELScNw#5)
 ]
 
-for p in (DATA_DIR,FIGURE_DIR, LOGS_DIR):
-    p.mkdir(parents=True, exist_ok=True)
+def createFolders():
+    for p in (DATA_DIR,FIGURE_DIR, LOGS_DIR, TEST_DIR):
+        p.mkdir(parents=True, exist_ok=True)
 
