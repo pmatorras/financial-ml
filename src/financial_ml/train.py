@@ -1,28 +1,37 @@
 import pandas as pd, numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import FunctionTransformer,StandardScaler
+from sklearn.impute import SimpleImputer
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-import yfinance as yf
-from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR
-import argparse
-
+from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR,FUNDA_KEYS, MARKET_KEYS
+from pandas.tseries.offsets import BQuarterEnd
+import warnings 
+sanitize = FunctionTransformer(
+    lambda X: np.where(np.isfinite(X), X, np.nan), validate=False
+)
 models = {
     "logreg_l2": Pipeline([
-        ("scaler", StandardScaler()),
+        ("sanitize", sanitize),                    # replace ±inf with NaN
+        ("impute", SimpleImputer(strategy="median")),  # handle NaN
+        ("scale", StandardScaler()),
         ("clf", LogisticRegression(max_iter=2000, C=1.0, class_weight="balanced"))
     ]),
     "logreg_l1": Pipeline([
-        ("scaler", StandardScaler()),
+        ("sanitize", sanitize),                    # replace ±inf with NaN
+        ("impute", SimpleImputer(strategy="median")),  # handle NaN
+        ("scale", StandardScaler()),
         ("clf", LogisticRegression(solver="liblinear", penalty="l1",
                                 C=0.5, max_iter=5000, class_weight="balanced"))
     ])
     ,
     "rf": Pipeline([
-        ("scaler", "passthrough"),  # trees don't need scaling
+        ("sanitize", sanitize),                    # replace ±inf with NaN
+        ("impute", SimpleImputer(strategy="median")),  # handle NaN
+        ("scaler", "passthrough"),  # trees don"t need scaling
         ("clf", RandomForestClassifier(n_estimators=100, max_depth=None,
                                     min_samples_leaf=5, n_jobs=-1, class_weight="balanced_subsample"))
     ])
@@ -90,7 +99,7 @@ def require_non_empty(df: pd.DataFrame, name: str, min_rows: int = 1, min_cols: 
     if n_rows < min_rows or n_cols < min_cols:
         raise ValueError(f"{name} too small: shape={df.shape}, expected at least ({min_rows}, {min_cols}).")
 
-def widenVariable(monthly, prices, m='us-gaap/Assets', u="USD"):
+def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
     monthly["period_end"] = pd.to_datetime(monthly["period_end"], errors="coerce")
 
     wide = (
@@ -106,6 +115,38 @@ def widenVariable(monthly, prices, m='us-gaap/Assets', u="USD"):
     require_non_empty(wide, "wide")
     return wide
 
+def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") -> pd.Series:
+    '''
+    Function to deal with sometimes empty mkcap values.
+    It calculates it when possible, if not raises a warning instead of dealing with infinities
+    '''
+    # Ensure numeric
+    p = pd.to_numeric(price, errors="coerce")
+    s = pd.to_numeric(shares, errors="coerce")
+
+    # Market cap
+    mcap = (p * s).astype(float)
+
+    # Identify problematic inputs for log
+    bad = ~np.isfinite(mcap) | (mcap <= 0)
+
+    # Raise a single warning with counts/ratio if any bad values exist
+    if bad.any():
+        n_bad = int(bad.sum())
+        frac = float(n_bad) / float(mcap.size)
+        warnings.warn(
+            f"LogMktCap: {n_bad} ({frac:.2%}) nonpositive/missing market cap values; "
+            "these entries will be left as NaN.",
+            category=UserWarning
+        )
+
+    # Compute log only on valid entries; leave others as NaN
+    out = pd.Series(np.nan, index=mcap.index, name=name)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        valid = np.isfinite(mcap) & (mcap > 0)
+        out.loc[valid] = np.log(mcap.loc[valid].to_numpy())
+
+    return out
 
 def train(args):
     prices, spy_benchmark = load_market(args)
@@ -122,11 +163,11 @@ def train(args):
     ret_1m.to_csv(TEST_DIR/"testret.csv")
 
     input_vars = [prices, ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
-    market_keys = ["ClosePrice", "r1", "r12", "mom121","vol3","vol12"]
+    market_keys = MARKET_KEYS
     funda_keys = []
     df_keys = market_keys.copy()          # safe copy for concat keys
     if args.trainfundamentals:
-        funda_keys = ["BookToMarket","ROE", "ROA", "NetMargin", "Leverage"]
+        funda_keys = FUNDA_KEYS
         fundamentals = load_fundamentals(args)
         monthly = to_monthly_ffill(fundamentals, maxdate="2025-12-31", freq="BME")
         require_non_empty(monthly, "monthly")
@@ -164,16 +205,63 @@ def train(args):
     require_non_empty(feat_long, "feat_long")
     if args.debug: print(feat_long.keys(), feat_long)
     if args.trainfundamentals:
-        feat_long["MarketEquity"] = feat_long["ClosePrice"] - feat_long["us-gaap/CommonStockSharesOutstanding"]
+        price = feat_long["ClosePrice"].astype(float)
+        shares = feat_long['us-gaap/CommonStockSharesOutstanding'].astype(float)
+        assets = feat_long["us-gaap/Liabilities"].astype(float)
+        # Size: log market cap at current date
+        market_cap = price * shares
+        mcap = market_cap.astype(float)
+        bad = ~np.isfinite(mcap) | (mcap <= 0)
+        print("nonpositive_or_missing:", bad.sum())           # count of bad inputs
+        print(mcap[bad].head())                                # spot-check values
+        if args.debug: mcap.to_csv(TEST_DIR/"marketcap.csv")
+        feat_long['LogMktCap'] = compute_log_mktcap(
+            feat_long['ClosePrice'],
+            feat_long['us-gaap/CommonStockSharesOutstanding'],
+            name='LogMktCap'
+)
+
+        dates = pd.Series(feat_long.index.get_level_values('Date'))
+        is_bqe = (dates == pd.DatetimeIndex([BQuarterEnd().rollback(d) for d in dates])).values
+        bq_roll = pd.DatetimeIndex([BQuarterEnd().rollback(d) for d in dates])
+
+        #Take quarter ends, and do the 4 quarter lags
+        assets_qe = assets[is_bqe]
+        shares_qe = shares[is_bqe]
+        assets_lag4 = assets_qe.groupby(level=1).shift(4)
+        shares_lag4 = shares_qe.groupby(level=1).shift(4)
+        inv_qe = (assets_qe - assets_lag4) / assets_lag4
+        iss_qe = (shares_qe - shares_lag4) / shares_lag4
+        if args.debug:
+            check = pd.DataFrame({
+                'Date': dates,
+                'BQ_Rollback': bq_roll,
+                'Is_BQ_End': is_bqe,
+            }).set_index('Date')
+            check.to_csv(TEST_DIR/"check_dates.csv", mode='x')
+        # Write quarterly results back and forward-fill to months for the asset growth and netshare insurance"    
+        feat_long['AssetGrowth'] = np.nan
+        feat_long.loc[inv_qe.index, 'AssetGrowth'] = inv_qe
+        feat_long['AssetGrowth'] = feat_long['AssetGrowth'].groupby(level=1).ffill()
+
+        feat_long['NetShareIssuance'] = np.nan
+        feat_long.loc[iss_qe.index, 'NetShareIssuance'] = iss_qe
+        feat_long['NetShareIssuance'] = feat_long['NetShareIssuance'].groupby(level=1).ffill()
+
+
+
+        feat_long["MarketEquity"] = price - shares
         feat_long["BookToMarket"] = feat_long["us-gaap/StockholdersEquity"] /feat_long["MarketEquity"]
-        eq = feat_long['us-gaap/StockholdersEquity'].astype(float)
-        feat_long['Equity_prev'] = eq.groupby(level=1).shift(1)
-        feat_long["AvgEquity"] = (feat_long['us-gaap/StockholdersEquity'] + feat_long['Equity_prev']) / 2.0
+        eq = feat_long["us-gaap/StockholdersEquity"].astype(float)
+        feat_long["Equity_prev"] = eq.groupby(level=1).shift(1)
+        feat_long["AvgEquity"] = (feat_long["us-gaap/StockholdersEquity"] + feat_long["Equity_prev"]) / 2.0
         feat_long["ROE"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["AvgEquity"]
         feat_long["ROA"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["us-gaap/Assets"]
         feat_long["NetMargin"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["us-gaap/Revenues"]
-        feat_long["Leverage"]=feat_long["us-gaap/Liabilities"]-feat_long["us-gaap/Assets"]
+        feat_long["Leverage"]=assets-feat_long["us-gaap/Assets"]
         if args.debug: print(feat_long.keys(), feat_long["ROE"])
+
+    #Add the Y to the datafrane
     y_long = y.stack().rename("y")
 
     df = feat_long.join(y_long, how="inner").dropna()

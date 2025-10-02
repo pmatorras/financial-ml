@@ -13,7 +13,8 @@ SP500_FUNDA_TEST = DATA_DIR/"sp500_fundamentals_test.csv"
 DATA_INTERVAL="1mo"
 START_STORE_DATE="1995-01-01"
 SP500_LIST_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-
+MARKET_KEYS = ["ClosePrice", "r1", "r12", "mom121","vol3","vol12"]
+FUNDA_KEYS  = ["BookToMarket","ROE", "ROA", "NetMargin", "Leverage",  'AssetGrowth',  'NetShareIssuance','LogMktCap']
 
 FUNDAMENTAL_VARS = [
     ("us-gaap","Assets","USD"),
