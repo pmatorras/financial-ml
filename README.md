@@ -136,14 +136,14 @@ Currently, the model takes information from both the market stock information (m
 
 The following variables are taken from the stock fundamentals:
 
-- Book-to-Market (B/M): $ B/M=\frac{Equity}{Price\times Shares} $ captures valuation relative to book value and is a canonical factor in asset pricing and cross-sectional models.
-- Return on Equity (ROE): $ ROE=\frac{Net Income_{TTM}}{Equity} $ measures profitability to equity holders and proxies the profitability factor component in five-factor frameworks.
-- Return on Assets (ROA): $ ROA=\frac{Net Income_{TTM}}{Assets} $ complements ROE by controlling for capital structure and overall asset base.
-- Net Margin: $ Net Margin=\frac{Net Income_{TTM}}{Revenues_{TTM}} $ gauges earnings efficiency and is routinely used in fundamental screens and profitability diagnostics.
-- Leverage: $ Leverage=\frac{Liabilities}{Assets} $ captures balance-sheet risk and interacts with profitability and value in expected return models.
-- Asset Growth (Investment): $ Inv=\frac{Assets_{t}-Assets_{t-4q}}{Assets_{t-4q}} $ maps to the investment factor where higher investment has been associated with lower average returns.
-- Net Share Issuance: $ Issuance=\frac{Shares_{t}-Shares_{t-4q}}{Shares_{t-4q}} $ tracks dilution/buybacks and has documented predictive power for subsequent returns.
-- Size (control): $ \log(Market Cap)=\log(Price\times Shares) $ provides a standard size control that stabilizes cross-sectional comparisons.
+- Book-to-Market (B/M):  captures valuation relative to book value and is a canonical factor in asset pricing and cross-sectional models. $B/M=\frac{Equity}{Price\times Shares}$
+- Return on Equity (ROE):  measures profitability to equity holders and proxies the profitability factor component in five-factor frameworks. $ROE=\frac{Net Income_{TTM}}{Equity}$
+- Return on Assets (ROA):  complements ROE by controlling for capital structure and overall asset base. $ROA=\frac{Net Income_{TTM}}{Assets}$
+- Net Margin: gauges earnings efficiency and is routinely used in fundamental screens and profitability diagnostics.  $Net Margin=\frac{Net Income_{TTM}}{Revenues_{TTM}}$
+- Leverage:  captures balance-sheet risk and interacts with profitability and value in expected return models. $Leverage=\frac{Liabilities}{Assets}$
+- Asset Growth (Investment):  maps to the investment factor where higher investment has been associated with lower average returns. $Inv=\frac{Assets_{t}-Assets_{t-4q}}{Assets_{t-4q}}$
+- Net Share Issuance:  tracks dilution/buybacks and has documented predictive power for subsequent returns. $Issuance=\frac{Shares_{t}-Shares_{t-4q}}{Shares_{t-4q}}$
+- Size (control):  provides a standard size control that stabilizes cross-sectional comparisons. $\log(Market Cap)=\log(Price\times Shares) $
 
  This set targets value, profitability, investment, leverage, size, and dilution, which align with widely used multi-factor models and documented cross-sectional return predictors.
 
@@ -151,7 +151,7 @@ The following variables are taken from the stock fundamentals:
  
 - Residual momentum: A stock’s trend after removing broad market/factor co‑movement, highlighting stock‑specific persistence rather than index‑driven moves.
 - 12‑month drawdown: The percent distance of the current price from its highest level over the past year, summarizing recent loss severity and recovery state.
-- Gross Profitability: $ \frac{Sales-COGS}{Assets} $ (requires [COGS](https://en.wikipedia.org/wiki/Cost_of_goods_sold)) is a strong profitability proxy complementary to ROE/ROA in cross-sectional models.
+- Gross Profitability: $\frac{Sales-COGS}{Assets}$ (requires [COGS](https://en.wikipedia.org/wiki/Cost_of_goods_sold)) is a strong profitability proxy complementary to ROE/ROA in cross-sectional models.
 - Accruals ([Sloan](https://quantpedia.com/strategies/accrual-anomaly)): requires cash flow from operations and current working-capital components to estimate accrual intensity, which is often predictive of returns.
 
 ### Modelling <div id="ml_models"></div>
