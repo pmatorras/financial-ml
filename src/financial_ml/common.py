@@ -20,7 +20,7 @@ FUNDAMENTAL_VARS = [
     ("us-gaap","StockholdersEquity","USD"),
     ("us-gaap","Revenues","USD"),
     ("us-gaap","NetIncomeLoss","USD"),
-    ("us-gaap","EarningsPerShareDiluted","USD/share"),
+#    ("us-gaap","EarningsPerShareDiluted","USD/share"),
     ("us-gaap","CommonStockSharesOutstanding","shares"), #Careful with double counting this (see https://www.perplexity.ai/search/i-am-developing-a-framework-th-6QC.Sc1JS1GjJQBfELScNw#5)
 ]
 
