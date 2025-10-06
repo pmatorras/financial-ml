@@ -25,7 +25,18 @@ FUNDAMENTAL_VARS = [
 #    ("us-gaap","EarningsPerShareDiluted","USD/share"),
     ("us-gaap","CommonStockSharesOutstanding","shares"), #Careful with double counting this (see https://www.perplexity.ai/search/i-am-developing-a-framework-th-6QC.Sc1JS1GjJQBfELScNw#5)
 ]
-
+CANONICAL_CONCEPTS = {
+    "SharesOutstanding": [
+        ("us-gaap", "CommonStockSharesOutstanding", "shares"),
+        ("dei", "EntityCommonStockSharesOutstanding", "shares"),
+    ],
+    "Assets": [("us-gaap", "Assets", "USD")],
+    "Liabilities": [("us-gaap", "Liabilities", "USD")],
+    "Equity": [("us-gaap", "StockholdersEquity", "USD")],
+    "Revenue": [("us-gaap", "Revenues", "USD")],
+    "NetIncome": [("us-gaap", "NetIncomeLoss", "USD")],
+    # Might add more
+}
 def createFolders():
     for p in (DATA_DIR,FIGURE_DIR, LOGS_DIR, TEST_DIR):
         p.mkdir(parents=True, exist_ok=True)

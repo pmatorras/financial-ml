@@ -6,7 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
 import pandas as pd
-from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS
+from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS, CANONICAL_CONCEPTS
 from .markets import fetch_sp500_list
 
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
@@ -25,21 +25,35 @@ def get_json(url, params=None, sleep=0.12):
     return r.json()
 
 def extract_tag_pit(cf_json, taxonomy, tag, unit):
-    '''Extract one tag/unit into a PIT series'''
+    # Try primary taxonomy/tag
+    print(taxonomy,tag)
     try:
-        facts = cf_json["facts"][taxonomy][tag]["units"][unit]
+        units = cf_json["facts"][taxonomy][tag]["units"]
+        facts = units.get(unit) or units.get(unit.capitalize())
     except KeyError:
+        facts = None
+
+    # Fallback to DEI when primary missing
+    if not facts and taxonomy != "dei":
+        try:
+            units = cf_json["facts"]["dei"][tag]["units"]
+            facts = units.get(unit) or units.get(unit.capitalize())
+        except KeyError:
+            facts = None
+
+    if not facts:
         return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
-    df = pd.DataFrame(facts)
-    # normalize and parse dates
-    df = df.rename(columns={"end":"period_end","val":"value"})
+
+    df = pd.DataFrame(facts).rename(columns={"end":"period_end","val":"value"})
     for col in ["period_end","filed","start"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
+    df["source_taxonomy"] = taxonomy
+    df["source_tag"] = tag
     df["metric"] = f"{taxonomy}/{tag}"
     df["unit"] = unit
-    # keep only dated facts
-    return df[["period_end","filed","value","metric","unit"]].dropna(subset=["filed"])
+    df["canonical_key"] = None  # default for non-resolved concepts
+    return df[["period_end","filed","value","metric","unit","source_taxonomy","source_tag","canonical_key"]].dropna(subset=["filed"])
 
 
 def dropDuplicateInfo(_df, key_cols):
@@ -47,10 +61,40 @@ def dropDuplicateInfo(_df, key_cols):
     df_last = _df.sort_values(key_cols).drop_duplicates(subset=key_cols, keep="last").sort_values(key_cols).reset_index(drop=True)
     return df_last
 
+def resolve_concept(cf_json, canonical_key, compare=False):
+    candidates = CANONICAL_CONCEPTS.get(canonical_key, [])
+    found = []
+    for tax, tag, unit in candidates:
+        df = extract_tag_pit(cf_json, tax, tag, unit)
+        if not df.empty:
+            found.append((tax, tag, unit, df))
+            if not compare:
+                return df
+    if not found:
+        return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+
+    if compare and len(found) > 1 and canonical_key == "SharesOutstanding":
+        us_df = next((d for t,g,u,d in found if t=="us-gaap"), None)
+        dei_df = next((d for t,g,u,d in found if t=="dei"), None)
+        if us_df is not None and dei_df is not None:
+            uval = us_df.sort_values(["filed","period_end"]).iloc[-1]["value"]
+            dval = dei_df.sort_values(["filed","period_end"]).iloc[-1]["value"]
+            ratio = max(uval, dval) / min(uval, dval) if min(uval, dval) else float("inf")
+            if ratio > 100:
+                print("Warning: DQC_0095-like scale mismatch for shares.")
+        chosen = us_df if us_df is not None else dei_df
+        out = chosen.copy()
+        out["canonical_key"] = canonical_key
+        return out
+
+    out = found[0][3].copy()
+    out["canonical_key"] = canonical_key
+    return out
 def fetch_facts_latest_for_cik(cik, ticker, targets):
     '''Retrieve each fundamentals for each company, using the SEC data'''
     cf = get_json(f"{BASE}/api/xbrl/companyfacts/CIK{cik}.json")
     series = [extract_tag_pit(cf, *t) for t in targets]
+    series.append(resolve_concept(cf, "SharesOutstanding", compare=True))
     series_nonempty = [df for df in series if not df.empty]
     cols = ["period_end","filed","value","metric","unit"]
     facts_long = (
@@ -74,7 +118,6 @@ def fundamentals(args):
     )
 
     universe = [ (cik, sym) for cik, sym in pairs ]
-    print("universe", universe)
     fundamentals_file= SP500_FUNDA_TEST if args.test else SP500_FUNDA_FILE
     #universe = [("0000066740","MMM"), ("0000320193","AAPL"), ("0000789019","MSFT")]; fundamentals_file="test_funda.csv" #Save this in case an even shorter test
     nstocks = len(universe)
@@ -82,6 +125,7 @@ def fundamentals(args):
     all_facts = []
     for i, (cik, ticker) in enumerate(universe, start=1):
         print(f"{i}/{nstocks}: {ticker}")
+        #if "AEP" not in ticker: continue
         try:
             df_i = fetch_facts_latest_for_cik(cik, ticker, FUNDAMENTAL_VARS)
             all_facts.append(df_i)
@@ -89,7 +133,6 @@ def fundamentals(args):
             print(f"skip {cik} {ticker}: {e}")
 
     facts_latest_all = pd.concat(all_facts, ignore_index=True)
-
     # Sort
     facts_latest_all = facts_latest_all.sort_values(
         ["ticker","metric","unit","period_end","filed"]
