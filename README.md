@@ -4,18 +4,18 @@ This project ingests S\&P 500 constituents, downloads historical monthly close p
 It can also fetch fundamentals for each company from public filings and persist tidy, time-aligned datasets for downstream modeling.
 
 ## Table of Contents
-- [Features <div id='Features'/>](#Features_<div_id='Features'/>)
-- [Project structure <div id='Structure'/>](#Project_structure_<div_id='Structure'/>)
-- [Installation <div id='Installation'/>](#Installation_<div_id='Installation'/>)
-- [Usage](#Usage)
-- [Data pipeline details](#Data_pipeline_details)
-- [Modeling and evaluation](#Modeling_and_evaluation)
-    - [Discriminating variables](#discriminating_vars)
-        - [Market variables](#market_vars)
-        - [Fundamental variables](#fundamental_vars)
-        - [Optional future extensions](#future_extensions)
-    - [Modelling](#ml_models)
-- [Outputs](#Outputs)
+- [Features](#features)
+- [Project structure](#project-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Data pipeline details](#data-pipeline-details)
+- [Modeling and evaluation](#modeling-and-evaluation)
+    - [Discriminating variables](#discriminating-variables)
+        - [From market behaviour](#variables-from-market-behaviours)
+        - [From fundamentals](#variables-from-fundamentals)
+        - [Possible future extensions](#possible-future-extensions)
+    - [Modelling](#modelling)
+- [Outputs](#outputs)
 - [Notes and compliance](#Notes_and_compliance)
 
 
@@ -24,8 +24,7 @@ It can also fetch fundamentals for each company from public filings and persist 
 
 
 
-## Features <div id='Features'/>
-<div id="Features_<div_id='Features'/>"></div>
+## Features
 
 - Fetch the current S\&P 500 list, normalize tickers for the market data API, and persist the symbols table.
 - Download monthly adjusted close prices for all S\&P 500 tickers and the benchmark instrument, writing tidy CSVs for full or test universes.
@@ -34,16 +33,14 @@ It can also fetch fundamentals for each company from public filings and persist 
 - Produce out-of-fold predictions per date and ticker for analysis and diagnostics.
 
 
-## Project structure <div id='Structure'/>
-<div id="Project_structure_<div_id='Structure'/>"></div>
+## Project structure
 
 - Entrypoint and CLI flags live in the main module that dispatches data collection, training, and fundamentals jobs.
 - Paths and output locations are centralized, with data/, figures/, and logs/ auto-created on first run.
 - Market data ingestion and symbol management are encapsulated in the markets module, and fundamentals ingestion in the fundamentals module.
 - The training pipeline, feature engineering, labeling, cross-validation, and metric reporting are implemented in the train module.
 
-## Installation <div id='Installation'/>
-<div id="Installation_<div_id='Installation'/>"></div>
+## Installation
 
 - Requires Python ≥ 3.10; core dependencies are declared in pyproject.toml (pandas, numpy, scikit-learn, yfinance, requests, pyarrow).
 - Option A — Development (editable install): install the package from source so local changes are picked up.
@@ -71,7 +68,7 @@ pip install -e .
 ```
 
 ## Usage
-<div id="Usage"></div>
+
 
 The CLI supports flags to update the S\&P 500 list, download market data, run fundamentals ingestion, enable a smaller test universe, and launch model training.
 
@@ -105,7 +102,6 @@ Flags summary:
 
 
 ## Data pipeline details
-<div id="Data_pipeline_details"></div>
 
 - Symbols: The S\&P 500 list is read from a public reference and saved to data/sp500_list.csv, with tickers normalized for downstream API compatibility.
 - Prices: Monthly adjusted close prices are downloaded for all symbols and for a benchmark instrument, saving to data/sp500_values.csv (or data/sp500_values_test.csv in test mode).
@@ -115,13 +111,12 @@ Flags summary:
 
 
 ## Modeling and evaluation
-<div id="Modeling_and_evaluation"></div>
 
-### Discriminating variables <div id="discriminating_vars"></div>
+### Discriminating variables
 
 Currently, the model takes information from both the market stock information (monthly basis), and (quaterly) fundamentals:
 
-#### Variables from market behaviours: <div id="market_vars"></div>
+#### Variables from market behaviours:
 
 - r1 (1m return): Captures the most recent monthly price move, providing a highly responsive but noisy signal that helps models account for short‑term dynamics and potential reversal pressure.
 
@@ -132,7 +127,7 @@ Currently, the model takes information from both the market stock information (m
 - vol3 (3m rolling std): Fast‑moving realized volatility over three months that reacts to recent shocks, useful for volatility‑managed scaling and down‑weighting unstable names.
 
 - vol12 (12m rolling std): Slower, more structural risk estimate over a full year that complements vol3 by distinguishing transient turbulence from persistent volatility regimes.
-#### Variables from fundamentals <div id="fundamental_vars"></div>
+#### Variables from fundamentals
 
 The following variables are taken from the stock fundamentals:
 
@@ -147,14 +142,14 @@ The following variables are taken from the stock fundamentals:
 
  This set targets value, profitability, investment, leverage, size, and dilution, which align with widely used multi-factor models and documented cross-sectional return predictors.
 
- #### Possible future extensions <div id="future_extensions"></div>
+ #### Possible future extensions
  
 - Residual momentum: A stock’s trend after removing broad market/factor co‑movement, highlighting stock‑specific persistence rather than index‑driven moves.
 - 12‑month drawdown: The percent distance of the current price from its highest level over the past year, summarizing recent loss severity and recovery state.
 - Gross Profitability: $\frac{Sales-COGS}{Assets}$ (requires [COGS](https://en.wikipedia.org/wiki/Cost_of_goods_sold)) is a strong profitability proxy complementary to ROE/ROA in cross-sectional models.
 - Accruals ([Sloan](https://quantpedia.com/strategies/accrual-anomaly)): requires cash flow from operations and current working-capital components to estimate accrual intensity, which is often predictive of returns.
 
-### Modelling <div id="ml_models"></div>
+### Modelling
 
 - Models: Current considered models include:
     - L2 and L1 logistic regression with scaling and class weighting, with an option to extend to tree-based models (baseline).
@@ -164,7 +159,6 @@ The following variables are taken from the stock fundamentals:
 
 
 ### Outputs
-<div id="Outputs"></div>
 
 - data/sp500_list.csv: symbols table used to drive downstream tasks.
 - data/sp500_values.csv and data/sp500_values_test.csv: monthly close prices per ticker plus benchmark.
@@ -173,7 +167,6 @@ The following variables are taken from the stock fundamentals:
 
 
 ### Notes and compliance
-<div id="Notes_and_compliance"></div>
 
 - Fundamentals ingestion uses a retry-enabled session and a descriptive User-Agent for responsible access to the filings API, and introduces a short sleep between requests.
 - Tickers containing a dot are normalized with a dash for compatibility with the market data API, and the benchmark instrument is appended to the universe.
