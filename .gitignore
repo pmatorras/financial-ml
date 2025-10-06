@@ -1,0 +1,25 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Environments
+.venv/
+venv/
+.env 
+
+# Builds and packaging
+build/
+dist/
+*.egg-info/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+# log data and fig directories
+logs/
+data/
+figures/
+
+# Jupyter
+.ipynb_checkpoints/
