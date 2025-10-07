@@ -3,6 +3,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR /"data"
 FIGURE_DIR = ROOT_DIR / "figures"
 TEST_DIR = ROOT_DIR / "test"
+DEBUG_DIR = ROOT_DIR /"debug"
 LOGS_DIR = ROOT_DIR / "logs"
 SP500_NAMES_FILE = DATA_DIR/"sp500_list.csv"
 SP500_MARKET_FILE = DATA_DIR/"sp500_market.csv"
@@ -38,6 +39,6 @@ CANONICAL_CONCEPTS = {
     # Might add more
 }
 def createFolders():
-    for p in (DATA_DIR,FIGURE_DIR, LOGS_DIR, TEST_DIR):
+    for p in (DATA_DIR,FIGURE_DIR, LOGS_DIR, TEST_DIR, DEBUG_DIR):
         p.mkdir(parents=True, exist_ok=True)
 

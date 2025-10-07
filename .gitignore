@@ -20,6 +20,7 @@ htmlcov/
 logs/
 data/
 figures/
+debug/
 
 # Jupyter
 .ipynb_checkpoints/

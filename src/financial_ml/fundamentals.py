@@ -26,7 +26,7 @@ def get_json(url, params=None, sleep=0.12):
 
 def extract_tag_pit(cf_json, taxonomy, tag, unit):
     # Try primary taxonomy/tag
-    print(taxonomy,tag)
+    #print(taxonomy,tag)
     try:
         units = cf_json["facts"][taxonomy][tag]["units"]
         facts = units.get(unit) or units.get(unit.capitalize())
@@ -137,7 +137,6 @@ def fundamentals(args):
     facts_latest_all = facts_latest_all.sort_values(
         ["ticker","metric","unit","period_end","filed"]
     ).reset_index(drop=True)
-
     # Write to CSV
     print("Saving file to:", fundamentals_file)
     facts_latest_all.to_csv(fundamentals_file, index=False)

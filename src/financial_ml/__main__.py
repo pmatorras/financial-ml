@@ -16,6 +16,7 @@ def main():
     args = parser.parse_args()
     print("Running the code")
     createFolders()
+    print(args)
     if args.newinfo or args.newtable: 
         print("Downloading market data...")
         store_info(args)
