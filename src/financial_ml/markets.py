@@ -6,7 +6,12 @@ import pandas as pd
 import warnings
 from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
-
+def test_subset(df, args):
+    if args.test: 
+        print("returning only test subset")
+        return df.sort_values('Date added').head(50)
+    else:
+        return df
 def fetch_sp500_list(filepath, args, url=SP500_LIST_URL, headers=headers):
     '''Download SP500 list of companies'''
     if args.newtable or os.path.getsize(filepath)<1:
@@ -23,9 +28,7 @@ def fetch_sp500_list(filepath, args, url=SP500_LIST_URL, headers=headers):
     else:   
         print(f"File {filepath} should be already available")
         df = pd.read_csv(filepath)
-    if args.test: 
-        print("returning only test subset")
-        df=df.sort_values('Date added').head(50)
+    df = test_subset(df,args)
     return df
 
 def fetch_sp500_marketdata(filepath, tickers, force_download=False, monthly="end"):

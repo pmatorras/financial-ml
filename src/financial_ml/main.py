@@ -3,31 +3,47 @@ from .markets import store_info
 from .train import train
 from .fundamentals import fundamentals
 from .common import createFolders
-def main():
-    parser = argparse.ArgumentParser(description="Compare GDP and Inflation for selected countries")
-    parser.add_argument("-nt", "--newtable", action="store_true", help="Update sp500 table")    
-    parser.add_argument("-ni", "--newinfo", action="store_true", help="Update sp500 financial information") 
-    parser.add_argument("--test"   , action="store_true", help="Test on a smaller subset of 50")    
-    parser.add_argument("-d", "--debug"   , action="store_true", help="Test on a smaller subset of 50")    
-    parser.add_argument("--train"   , action="store_true", help="perform the training")
-    parser.add_argument("-f", "--fundamentals"   , action="store_true", help="Download fundamentals")   
-    parser.add_argument("-tf", "--trainfundamentals"   , action="store_true", help="Use also fundamentals to train")   
+def cli():
+    parser = argparse.ArgumentParser(prog="financial_ml",
+                                     description="S&P 500 data pipeline: fetch, fundamentals, train")
+    parser.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
+    parser.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
 
-    args = parser.parse_args()
-    print("Running the code")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_info = sub.add_parser("market", help="Download/refresh market data")
+    p_info.add_argument("--newtable","-nt", action="store_true", help="Refresh S&P 500 constituents")
+    p_info.add_argument("--newinfo", "-ni", action="store_true", help="Refresh historical market data")
+
+    p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
+    # add funda-specific options if any
+
+    p_train = sub.add_parser("train", help="Train models")
+    p_train.add_argument("--use-fundamentals", action="store_true",
+                         help="Include fundamentals in training features")
+    #ensure --test --debug can go anywhere
+    for sp in (p_info, p_funda, p_train):
+        sp.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
+        sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
+
+
+    return parser
+
+def main(argv=None):
+    parser = cli()
+    args = parser.parse_args(argv)
+
+    print(f"Running the code, with arguments: {args}")
     createFolders()
-    print(args)
-    if args.newinfo or args.newtable: 
+
+
+    if args.cmd == "market":
         print("Downloading market data...")
         store_info(args)
-    if args.fundamentals: 
+    elif args.cmd == "fundamentals":
         print("Downloading fundamentals")
         fundamentals(args)
-    if args.train: 
+    elif args.cmd == "train":
         print("Performing training")
         train(args)
-
-
-
-if __name__ == "__main__":
-    main()
+    return 0

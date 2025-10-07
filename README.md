@@ -70,35 +70,49 @@ pip install -e .
 ## Usage
 
 
-The CLI supports flags to update the S\&P 500 list, download market data, run fundamentals ingestion, enable a smaller test universe, and launch model training.
+Fetch S&P 500 constituents and market data:
+```bash
+# Update constituents
+python -m financial_ml info --newtable
 
-- Update symbols and prices, then train:
+# Update historical market data
+python -m financial_ml info --newinfo
 
+# Both together (with global flags placed before the subcommand)
+python -m financial_ml --test -d info --newtable --newinfo
 ```
-python -m financial_ml -nt -ni --train
+- The info subcommand separates refreshing the constituents list from downloading prices to make each step explicit and repeatable.
+
+Download SEC fundamentals:
+```bash
+# Download/refresh fundamentals
+python -m financial_ml fundamentals
+
+# Test subset for faster iteration
+python -m financial_ml --test fundamentals
 ```
+- Fundamentals use the existing constituents file; refresh constituents first if needed via the info subcommand.
 
-Replace <package> with the actual package name that contains the modules shown here.
+Train models:
+```bash
+# Train with market-only features
+python -m financial_ml train
 
-- Fetch fundamentals for the full universe:
+# Train including fundamentals-derived features
+python -m financial_ml train --use-fundamentals
 
+# Combine with test/debug
+python -m financial_ml --test -d train --use-fundamentals
 ```
-python -m financial_ml -f
-```
+- Pipelines sanitize invalid values, impute missing data, and scale features for linear models; trees use passthrough scaling by design.
 
-- Run a quicker workflow on a 50-ticker subset:
-
-```
-python -m financial_ml -nt -ni -f --test
-```
-
-Flags summary:
-
-- -nt/--newtable: refresh the S\&P 500 symbols table.
-- -ni/--newinfo: download or refresh market price history CSVs.
-- -f/--fundamentals: retrieve and store selected fundamentals from filings.
-- --train: run the modeling pipeline on engineered features.
-- --test: operate on a smaller universe to speed up iteration.
+Notes:
+- Global flags: 
+    - `--test`: Run a reduced subset
+    - `-d/--debug` for verbose output.
+- If the usage is unclear, run `--help` flag: `python -m financial_ml --help`
+- One can also use `python -m financial_ml.main` to run it without callin __main__.py.  
+- Constituents refresh (newtable) and market data refresh (newinfo) are intentionally separated from fundamentals and training so each step can be run independently.
 
 
 ## Data pipeline details

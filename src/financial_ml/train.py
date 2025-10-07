@@ -208,7 +208,7 @@ def train(args):
     funda_keys = []
     df_keys = market_keys.copy()          # safe copy for concat keys
 
-    if args.trainfundamentals:
+    if args.use_fundamentals:
         funda_keys = FUNDA_KEYS
         fundamentals = load_fundamentals(args)
         if args.debug: fundamentals.to_csv(DEBUG_DIR/"funda.csv")
@@ -260,7 +260,7 @@ def train(args):
         feat_long["canonical_key"] = ""
     require_non_empty(feat_long, "feat_long")
     if args.debug: print(feat_long.keys(), feat_long)
-    if args.trainfundamentals:
+    if args.use_fundamentals:
         price = feat_long["ClosePrice"].astype(float)
         if args.debug: feat_long.to_csv(DEBUG_DIR/"feat_long.csv")
         #n_shares = feat_long['us-gaap/CommonStockSharesOutstanding'].astype(float)
@@ -353,7 +353,7 @@ def train(args):
 
     pred_rows = []
     models = get_models()
-    print(models)
+    print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
     for name, pipe in models.items():
         aucs_test = []
         aucs_train = []
