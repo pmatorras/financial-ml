@@ -7,35 +7,11 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR,FUNDA_KEYS, MARKET_KEYS
+from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, DEBUG_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
+from .models import get_models
 from pandas.tseries.offsets import BQuarterEnd
 import warnings 
-sanitize = FunctionTransformer(
-    lambda X: np.where(np.isfinite(X), X, np.nan), validate=False
-)
-models = {
-    "logreg_l2": Pipeline([
-        ("sanitize", sanitize),                    # replace ±inf with NaN
-        ("impute", SimpleImputer(strategy="median")),  # handle NaN
-        ("scale", StandardScaler()),
-        ("clf", LogisticRegression(max_iter=2000, C=1.0, class_weight="balanced"))
-    ]),
-    "logreg_l1": Pipeline([
-        ("sanitize", sanitize),                    # replace ±inf with NaN
-        ("impute", SimpleImputer(strategy="median")),  # handle NaN
-        ("scale", StandardScaler()),
-        ("clf", LogisticRegression(solver="liblinear", penalty="l1",
-                                C=0.5, max_iter=5000, class_weight="balanced"))
-    ])
-    ,
-    "rf": Pipeline([
-        ("sanitize", sanitize),                    # replace ±inf with NaN
-        ("impute", SimpleImputer(strategy="median")),  # handle NaN
-        ("scaler", "passthrough"),  # trees don"t need scaling
-        ("clf", RandomForestClassifier(n_estimators=100, max_depth=None,
-                                    min_samples_leaf=5, n_jobs=-1, class_weight="balanced_subsample"))
-    ])
-}
+
 
 def load_market(args):
     csv_filenm = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
@@ -53,17 +29,61 @@ def load_market(args):
         spy = yf.download("SPY", interval="1mo", auto_adjust=True, progress=False)["Close"].reindex(px_m.index).ffill()
     return px_m, spy
 def load_fundamentals(args):
+    if args.debug: csv_filenm = DEBUG_DIR/ "funda_short.csv"
     csv_filenm = SP500_FUNDA_TEST if args.test else SP500_FUNDA_FILE
     print("opening", csv_filenm)
     f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"])
+    for c in ("source_taxonomy","source_tag","canonical_key"):
+        if c not in f.columns:
+            f[c] = ""
     f["metric"] = f["metric"].astype("string")
-    if args.debug: print(f.keys())
-    f[["taxonomy","tag"]] = f["metric"].str.split("/", n=1, expand=True)
+    if args.debug: 
+        print(f.keys())
+        print(f.columns.tolist())
 
-    targets = pd.DataFrame(FUNDAMENTAL_VARS, columns=["taxonomy","tag","unit"])
-    f_sel = f.merge(targets, on=["taxonomy","tag","unit"], how="inner")
-    if args.debug: print(f_sel.keys())
-    f_sel = f_sel.drop(columns=["taxonomy","tag"])
+    # Split metric into taxonomy/tag for join keys
+    f[["taxonomy", "tag"]] = f["metric"].str.split("/", n=1, expand=True)
+
+    # Build target map from CANONICAL_CONCEPTS
+    rows = []
+    for key, cands in CANONICAL_CONCEPTS.items():
+        for tax, tag, unit in cands:
+            rows.append({"taxonomy": tax, "tag": tag, "unit": unit, "canonical_key": key})
+    targets = pd.DataFrame(rows, columns=["taxonomy", "tag", "unit", "canonical_key"])
+
+    # Single merge; keep explicit suffixes to control name collisions
+    f_sel = f.merge(
+        targets,
+        on=["taxonomy", "tag", "unit"],
+        how="inner",
+        suffixes=("_src", "_tgt"),
+    )
+
+    # Pick canonical_key from targets; fallback to source if targets missing
+    if "canonical_key_tgt" in f_sel.columns and "canonical_key_src" in f_sel.columns:
+        f_sel["canonical_key"] = f_sel["canonical_key_tgt"].where(
+            f_sel["canonical_key_tgt"].notna() & (f_sel["canonical_key_tgt"] != ""),
+            f_sel["canonical_key_src"],
+        )
+        f_sel = f_sel.drop(columns=["canonical_key_src", "canonical_key_tgt"])
+    elif "canonical_key_tgt" in f_sel.columns:
+        f_sel = f_sel.rename(columns={"canonical_key_tgt": "canonical_key"})
+    # else: keep existing canonical_key if only _src exists
+
+    # Ensure source_* populated so downstream can reuse chosen source
+    for col, base in [("source_taxonomy", "taxonomy"), ("source_tag", "tag")]:
+        if col not in f_sel.columns:
+            f_sel[col] = f_sel[base]
+        else:
+            f_sel[col] = f_sel[col].where(f_sel[col] != "", f_sel[base])
+
+    # Drop helper split columns
+    f_sel = f_sel.drop(columns=["taxonomy", "tag"])
+
+    if args.debug:
+        print(f_sel.columns.tolist())
+
+    if args.debug: f_sel.to_csv(DEBUG_DIR/"fsel.csv")
     return f_sel
 
 def to_monthly_ffill(df, maxdate=None, freq="BM"):
@@ -115,6 +135,26 @@ def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
     require_non_empty(wide, "wide")
     return wide
 
+def ensure_shares(monthly, prices):
+    # Accept both aliases explicitly via metric
+    share_metrics = {
+        "us-gaap/CommonStockSharesOutstanding",
+        "dei/EntityCommonStockSharesOutstanding",
+    }
+
+    shares = (
+        monthly.loc[
+            monthly["metric"].isin(share_metrics),
+            ["period_end", "ticker", "metric", "unit", "value"],
+        ]
+        .sort_values(["ticker", "period_end", "metric"])
+        .drop_duplicates(subset=["ticker", "period_end"], keep="last")  # prefer later metric if both present
+        .pivot(index="period_end", columns="ticker", values="value")
+        .reindex(index=prices.index, columns=prices.columns)
+    )
+
+    # Ensure numeric
+    return pd.to_numeric(shares.stack(), errors="coerce").unstack()
 def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") -> pd.Series:
     '''
     Function to deal with sometimes empty mkcap values.
@@ -148,6 +188,13 @@ def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") ->
 
     return out
 
+def safe_div(numer, denom):
+    #return nan if negative/zero denominators
+    numer = pd.to_numeric(numer, errors="coerce")
+    denom = pd.to_numeric(denom, errors="coerce")
+    out = numer / denom
+    return out.where((denom > 0) & np.isfinite(out))
+
 def train(args):
     prices, spy_benchmark = load_market(args)
     require_non_empty(prices, "prices")
@@ -160,27 +207,40 @@ def train(args):
     vol_3m = ret_1m.rolling(3).std() #volumes
     vol_12m = ret_1m.rolling(12).std()
 
-    ret_1m.to_csv(TEST_DIR/"testret.csv")
+    ret_1m.to_csv(DEBUG_DIR/"testret.csv")
 
     input_vars = [prices, ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
     market_keys = MARKET_KEYS
     funda_keys = []
     df_keys = market_keys.copy()          # safe copy for concat keys
+
     if args.trainfundamentals:
         funda_keys = FUNDA_KEYS
         fundamentals = load_fundamentals(args)
+        if args.debug: fundamentals.to_csv(DEBUG_DIR/"funda.csv")
         monthly = to_monthly_ffill(fundamentals, maxdate="2025-12-31", freq="BME")
+        if args.debug: monthly.to_csv(DEBUG_DIR/"monthly.csv")
         require_non_empty(monthly, "monthly")
-        for fundavar in FUNDAMENTAL_VARS:
-            fundamental = "us-gaap/"+fundavar[1]
-            unit = fundavar[2]
-            if args.debug:
-                print(f"processing: {fundamental} [{unit}]")
-            widen = widenVariable(monthly, prices, fundamental, unit)    
-            widen.to_csv(TEST_DIR/"widen.csv")
-            df_keys.append(fundamental)
-            input_vars.append(widen)
-    input_keys=market_keys+funda_keys   
+        shares = ensure_shares(monthly, prices)
+        if args.debug: shares.to_csv(DEBUG_DIR/"shares.csv")
+        require_non_empty(shares, "SharesOutstanding")
+        shares.name = "SharesOutstanding"
+
+        # 2) Non-share concepts by exact metric (unchanged behavior)
+        input_vars = [prices, ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
+        df_keys = MARKET_KEYS.copy()
+
+        for tax, tag, unit in FUNDAMENTAL_VARS:
+            m = f"{tax}/{tag}"
+            wide = widenVariable(monthly, prices, m, unit)
+            input_vars.append(wide)
+            df_keys.append(tag if tag not in ("CommonStockSharesOutstanding","EntityCommonStockSharesOutstanding") else "IGNORED")
+
+        # Inject the canonical shares column explicitly once
+        input_vars.append(shares)
+        df_keys.append("SharesOutstanding")
+
+    input_keys=market_keys+funda_keys
     if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
         exit()
@@ -189,7 +249,7 @@ def train(args):
         for k, df in zip(df_keys, input_vars):
             print(k, type(df.index), df.index.min(), df.index.max(), df.shape)
     feat = pd.concat(input_vars, axis=1, keys=df_keys)
-    feat.to_csv(TEST_DIR/"feat.csv")
+    if args.debug: feat.to_csv(DEBUG_DIR/"feat.csv")
     
     # Label: 12m forward total return > 0
     stock_fwd12 = prices.pct_change(12, fill_method=None).shift(-12)     # stock forward 12m return
@@ -202,22 +262,28 @@ def train(args):
 
     # Align and stack panel to long format
     feat_long = feat.stack(level=1,future_stack=True)
+    if "canonical_key" not in feat_long.columns:
+        feat_long["canonical_key"] = ""
     require_non_empty(feat_long, "feat_long")
     if args.debug: print(feat_long.keys(), feat_long)
     if args.trainfundamentals:
         price = feat_long["ClosePrice"].astype(float)
-        shares = feat_long['us-gaap/CommonStockSharesOutstanding'].astype(float)
-        assets = feat_long["us-gaap/Liabilities"].astype(float)
+        if args.debug: feat_long.to_csv(DEBUG_DIR/"feat_long.csv")
+        #n_shares = feat_long['us-gaap/CommonStockSharesOutstanding'].astype(float)
+        n_shares = feat_long["SharesOutstanding"].astype(float)
+        if args.debug: n_shares.to_csv(DEBUG_DIR/"nshares.csv")
+        liabilities = feat_long["Liabilities"].astype(float)
+        assets = feat_long["Assets"].astype(float)
         # Size: log market cap at current date
-        market_cap = price * shares
+        market_cap = price * n_shares
         mcap = market_cap.astype(float)
         bad = ~np.isfinite(mcap) | (mcap <= 0)
-        print("nonpositive_or_missing:", bad.sum())           # count of bad inputs
-        print(mcap[bad].head())                                # spot-check values
-        if args.debug: mcap.to_csv(TEST_DIR/"marketcap.csv")
+        if args.debug: print("nonpositive_or_missing:", bad.sum())           # count of bad inputs
+        if args.debug: print(mcap[bad].head())                                # spot-check values
+        if args.debug: mcap.to_csv(DEBUG_DIR/"marketcap.csv")
         feat_long['LogMktCap'] = compute_log_mktcap(
-            feat_long['ClosePrice'],
-            feat_long['us-gaap/CommonStockSharesOutstanding'],
+            price,
+            n_shares,
             name='LogMktCap'
 )
 
@@ -227,7 +293,7 @@ def train(args):
 
         #Take quarter ends, and do the 4 quarter lags
         assets_qe = assets[is_bqe]
-        shares_qe = shares[is_bqe]
+        shares_qe = n_shares[is_bqe]
         assets_lag4 = assets_qe.groupby(level=1).shift(4)
         shares_lag4 = shares_qe.groupby(level=1).shift(4)
         inv_qe = (assets_qe - assets_lag4) / assets_lag4
@@ -238,7 +304,7 @@ def train(args):
                 'BQ_Rollback': bq_roll,
                 'Is_BQ_End': is_bqe,
             }).set_index('Date')
-            check.to_csv(TEST_DIR/"check_dates.csv", mode='x')
+            if args.debug: check.to_csv(DEBUG_DIR/"check_dates.csv", mode='x')
         # Write quarterly results back and forward-fill to months for the asset growth and netshare insurance"    
         feat_long['AssetGrowth'] = np.nan
         feat_long.loc[inv_qe.index, 'AssetGrowth'] = inv_qe
@@ -248,17 +314,20 @@ def train(args):
         feat_long.loc[iss_qe.index, 'NetShareIssuance'] = iss_qe
         feat_long['NetShareIssuance'] = feat_long['NetShareIssuance'].groupby(level=1).ffill()
 
-
-
-        feat_long["MarketEquity"] = price - shares
-        feat_long["BookToMarket"] = feat_long["us-gaap/StockholdersEquity"] /feat_long["MarketEquity"]
-        eq = feat_long["us-gaap/StockholdersEquity"].astype(float)
+        eq = feat_long["StockholdersEquity"].astype(float)
+        netIncome = feat_long["NetIncomeLoss"]
+        # Compute lag and average equity first
         feat_long["Equity_prev"] = eq.groupby(level=1).shift(1)
-        feat_long["AvgEquity"] = (feat_long["us-gaap/StockholdersEquity"] + feat_long["Equity_prev"]) / 2.0
-        feat_long["ROE"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["AvgEquity"]
-        feat_long["ROA"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["us-gaap/Assets"]
-        feat_long["NetMargin"]=feat_long["us-gaap/NetIncomeLoss"]-feat_long["us-gaap/Revenues"]
-        feat_long["Leverage"]=assets-feat_long["us-gaap/Assets"]
+        feat_long["AvgEquity"] = (eq + feat_long["Equity_prev"]) / 2.0
+
+        #market equity
+        feat_long["MarketEquity"] = price * n_shares
+        feat_long["BookToMarket"] = safe_div(eq,feat_long["MarketEquity"])
+        feat_long["ROE"]= safe_div(netIncome,feat_long["AvgEquity"])
+        feat_long["ROA"]= safe_div(netIncome,assets)
+
+        feat_long["NetMargin"]=safe_div(netIncome,feat_long["Revenues"])
+        feat_long["Leverage"]=safe_div(liabilities,assets)
         if args.debug: print(feat_long.keys(), feat_long["ROE"])
 
     #Add the Y to the datafrane
@@ -277,7 +346,7 @@ def train(args):
     # Optional: ensure no NaNs remain in features/label before splitting
 
     df = df.dropna(subset=input_keys)
-    print("input keys", input_keys)
+    print("Input variables to train", input_keys)
     X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()
 
@@ -289,6 +358,8 @@ def train(args):
     tscv = TimeSeriesSplit(n_splits=5,test_size=36)
 
     pred_rows = []
+    models = get_models()
+    print(models)
     for name, pipe in models.items():
         aucs_test = []
         aucs_train = []
