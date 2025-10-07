@@ -1,11 +1,5 @@
 import pandas as pd, numpy as np
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import FunctionTransformer,StandardScaler
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, DEBUG_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
 from .models import get_models
@@ -214,7 +208,7 @@ def train(args):
     funda_keys = []
     df_keys = market_keys.copy()          # safe copy for concat keys
 
-    if args.trainfundamentals:
+    if args.use_fundamentals:
         funda_keys = FUNDA_KEYS
         fundamentals = load_fundamentals(args)
         if args.debug: fundamentals.to_csv(DEBUG_DIR/"funda.csv")
@@ -266,7 +260,7 @@ def train(args):
         feat_long["canonical_key"] = ""
     require_non_empty(feat_long, "feat_long")
     if args.debug: print(feat_long.keys(), feat_long)
-    if args.trainfundamentals:
+    if args.use_fundamentals:
         price = feat_long["ClosePrice"].astype(float)
         if args.debug: feat_long.to_csv(DEBUG_DIR/"feat_long.csv")
         #n_shares = feat_long['us-gaap/CommonStockSharesOutstanding'].astype(float)
@@ -359,7 +353,7 @@ def train(args):
 
     pred_rows = []
     models = get_models()
-    print(models)
+    print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
     for name, pipe in models.items():
         aucs_test = []
         aucs_train = []

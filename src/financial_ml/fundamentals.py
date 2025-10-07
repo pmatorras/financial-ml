@@ -7,7 +7,7 @@ from urllib3.util.retry import Retry
 import os
 import pandas as pd
 from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS, CANONICAL_CONCEPTS
-from .markets import fetch_sp500_list
+from .markets import test_subset
 
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
 UA = "ResearchBot/1.0 (contact@example.com)"  
@@ -110,7 +110,9 @@ def fetch_facts_latest_for_cik(cik, ticker, targets):
 
 def fundamentals(args):
     '''Retrieve sp500 information from markets.py, and obtain the fundamentals for these'''
-    df = fetch_sp500_list(SP500_NAMES_FILE, args)
+    print(SP500_NAMES_FILE)
+    df_all = pd.read_csv(SP500_NAMES_FILE)
+    df=test_subset(df_all,args)
     pairs = list(
         df.loc[:, ["CIK", "Symbol"]]
         .assign(CIK=lambda x: x["CIK"].astype(str).str.zfill(10))
