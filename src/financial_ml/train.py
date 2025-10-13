@@ -80,24 +80,38 @@ def load_fundamentals(args):
     if args.debug: f_sel.to_csv(DEBUG_DIR/"fsel.csv")
     return f_sel
 
-def to_monthly_ffill(df, maxdate=None, freq="BM"):
+def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
     """
     Minimal monthly duplication by period_end:
     - Groups by (ticker, metric, unit)
     - Resamples at monthly frequency on period_end
     - Forward-fills to duplicate values between quarter ends
+    - ADDS LAG to simulate reporting delay
     """
     gcols = ["ticker", "metric", "unit"]
-    out = (
+
+    #remove duplicates, keep the last filing
+    df_clean = (
         df.copy()
-          .assign(period_end=pd.to_datetime(df["period_end"], errors="coerce", utc=True).dt.tz_convert(None))
-          .sort_values(gcols + ["period_end"])
-          .set_index("period_end")
+        .assign(
+            period_end=pd.to_datetime(df["period_end"], errors="coerce", utc=True).dt.tz_convert(None),
+            filed=pd.to_datetime(df["filed"], errors="coerce", utc=True).dt.tz_convert(None)
+        )
+        .sort_values(gcols + ["filed", "period_end"])  # Sort by filed date
+        .drop_duplicates(subset=gcols + ["filed"], keep="last")  # Keep last if duplicate
+    )
+    out = (
+        df_clean.copy()
+          .assign(filed=pd.to_datetime(df["filed"], errors="coerce", utc=True).dt.tz_convert(None))
+          .sort_values(gcols + ["filed"])
+          .set_index("filed")
           .groupby(gcols)["value"]
           .resample(freq)
           .ffill()
           .rename("value")
           .reset_index()
+          .rename(columns={"filed": "period_end"})  
+
     )
 
     if maxdate is not None:
@@ -188,6 +202,8 @@ def safe_div(numer, denom):
     denom = pd.to_numeric(denom, errors="coerce")
     out = numer / denom
     return out.where((denom > 0) & np.isfinite(out))
+
+
 
 def train(args):
     prices, spy_benchmark = load_market(args)
@@ -349,10 +365,11 @@ def train(args):
     X, Y = X[order], Y[order]
     unique_dates = np.array(sorted(df["date"].unique()))
 
-    tscv = TimeSeriesSplit(n_splits=5,test_size=36)
+    tscv = TimeSeriesSplit(n_splits=3,test_size=36,gap=1)
 
     pred_rows = []
     models = get_models()
+    trained_models = {}
     print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
     for name, pipe in models.items():
         aucs_test = []
@@ -376,7 +393,10 @@ def train(args):
                     f"Test {te_start.date()} → {te_end.date()} | "
                     #f"Test class counts {dict(zip(classes, counts))}"
                     )
-
+            print(f"[{name} | Fold {split_id}] "
+                  f"Train {tr_start.date()} → {tr_end.date()} | "
+                  f"Test {te_start.date()} → {te_end.date()} | "
+                    )
             pipe.fit(Xtrain, Ytrain)
             p_train = pipe.predict_proba(Xtrain)[:,1]
             p_test = pipe.predict_proba(Xtest)[:,1]
@@ -389,9 +409,21 @@ def train(args):
             fold_df["fold"] = split_id
             fold_df["model"] = name
             pred_rows.append(fold_df)
+
+        trained_models[name] = pipe
         print("Baseline logistic train AUC ("+name+"):", np.round(aucs_train, 3).tolist())
         print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, 3).tolist())
+
     pred_df = pd.concat(pred_rows, ignore_index=True)
     predpath = DATA_DIR/"oof_predictions.csv"
     pred_df.to_csv(predpath, index=False)
 
+    from financial_ml.feature_importance import analyze_feature_importance
+    analyze_feature_importance(
+        models_dict=trained_models, # Dict with model names as keys, trained pipelines as values
+        X=X,                       # numpy array shape (n_samples, n_features)
+        y=Y,                       # numpy array shape (n_samples,)
+        feature_names=input_keys   # List like ['ClosePrice', 'r1', 'r12', 'mom121', ...]
+    )
+
+    

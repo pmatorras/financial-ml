@@ -29,8 +29,16 @@ def get_models():
             ("sanitize", sanitize),                    # replace ±inf with NaN
             ("impute", SimpleImputer(strategy="median")),  # handle NaN
             ("scaler", "passthrough"),  # trees don"t need scaling
-            ("clf", RandomForestClassifier(n_estimators=100, max_depth=None,
-                                        min_samples_leaf=5, n_jobs=-1, class_weight="balanced_subsample"))
+            ("clf", RandomForestClassifier(n_estimators=50, 
+                                           max_depth=4,
+                                           min_samples_split=0.01,
+                                           min_samples_leaf=0.005,
+                                           max_features='log2',#'sqrt',
+                                           random_state=42,
+                                           n_jobs=-1, 
+                                           class_weight="balanced"
+
+                                        ))
         ])
     }
     return models
