@@ -2,50 +2,28 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from financial_ml.common import DATA_DIR, PRED_FILE, SP500_MARKET_FILE
-# ============================
-# STEP 1: Load Data
-# ============================
-# Load predictions
+
+# Load Data for predictions, stocks, and SPY benchmark
 preds = pd.read_csv(PRED_FILE)
 preds['date'] = pd.to_datetime(preds['date'])
-# Load stock prices
 prices = pd.read_csv(SP500_MARKET_FILE, index_col=0, parse_dates=True).ffill()
-
-# Load SPY benchmark
 spy = prices['SPY'] if 'SPY' in prices.columns else None
 prices = prices.drop(columns=['SPY'], errors='ignore')
-# Calculate monthly returns
 
+# Calculate monthly returns
 returns_realized = prices.pct_change(periods=1).stack().reset_index()
 returns_realized.columns = ['date', 'ticker', 'return']
-# ============================
-# STEP 2: Merge Predictions with Returns
-# ============================
+
+# Merge Predictions with Returns
 df = preds.merge(returns_realized, on=['date', 'ticker'], how='inner')
 
 # Filter to best model (Logistic L2)
 df = df[df['model'] == 'rf'].copy()
-print("\n=== PRE-FILTER DIAGNOSTIC ===")
 
-# Group by fold and check date ranges
-for fold in [1, 2, 3]:
-    fold_data = df[df['fold'] == fold]
-    if len(fold_data) > 0:
-        print(f"\nFold {fold}:")
-        print(f"  Date range: {fold_data['date'].min().date()} to {fold_data['date'].max().date()}")
-        print(f"  Total predictions: {len(fold_data)}")
+from financial_ml.portfolio_diagnostics import pre_filter_diagnostics
+pre_filter_diagnostics(df)
 
-# Check if any date has multiple folds
-duplicates = df.groupby(['date', 'ticker']).size()
-multi_fold_dates = duplicates[duplicates > 1]
-print(f"\n⚠️ Dates with multiple fold predictions: {len(multi_fold_dates)}")
-if len(multi_fold_dates) > 0:
-    print("Sample conflicts:")
-    print(multi_fold_dates.head(10))
-
-# ============================
-# STEP 3: Construct Portfolio
-# ============================
+# Construct Portfolio
 def construct_portfolio(df, per_top=10, per_bot=10):
     """Long top per_top, short bottom per_bot
        keep ALL columns including date"""
@@ -64,9 +42,7 @@ def construct_portfolio(df, per_top=10, per_bot=10):
 
 df =construct_portfolio(df)
 
-# ============================
-# STEP 4: Calculate Portfolio Returns
-# ============================
+# Calculate Portfolio Returns
 def calc_portfolio_return(group, type='100long'):
     long_ret = group[group['position'] == 1]['return'].mean()
     short_ret = group[group['position'] == -1]['return'].mean()
@@ -90,9 +66,6 @@ def calc_portfolio_return(group, type='100long'):
 portfolio_returns = df.groupby('date').apply(calc_portfolio_return, include_groups=False).reset_index()
 portfolio_returns.columns = ['date', 'portfolio_return']
 
-# ============================
-# STEP 4: Calculate Metrics
-# ============================
 # Cumulative returns
 portfolio_returns['cum_return'] = (1 + portfolio_returns['portfolio_return']).cumprod()
 
@@ -128,9 +101,11 @@ max_drawdown = drawdown.min()
 # Win Rate
 win_rate = (portfolio_returns['portfolio_return'] > 0).sum() / len(portfolio_returns)
 
-# ============================
-# STEP 5: Print Results
-# ============================
+from financial_ml.portfolio_diagnostics import test_sharpe_significance
+
+test_sharpe_significance(portfolio_returns=portfolio_returns, sharpe_ratio=sharpe_ratio)
+
+
 print("=" * 60)
 print("PORTFOLIO PERFORMANCE METRICS")
 print("=" * 60)
@@ -142,9 +117,7 @@ print(f"Annual Volatility:   {volatility:.1%}")
 print(f"Total Return:        {(portfolio_returns['cum_return'].iloc[-1] - 1):.1%}")
 print("=" * 60)
 
-# ============================
-# STEP 6: Visualizations
-# ============================
+# Visualizations
 fig, axes = plt.subplots(2, 1, figsize=(12, 10))
 
 # Chart 1: Cumulative Returns
