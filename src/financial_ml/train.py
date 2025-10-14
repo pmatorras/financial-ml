@@ -262,8 +262,8 @@ def train(args):
     if args.debug: feat.to_csv(DEBUG_DIR/"feat.csv")
     
     # Label: 12m forward total return > 0
-    stock_fwd12 = prices.pct_change(12, fill_method=None).shift(-12)     # stock forward 12m return
-    spy_benchmark_fwd12   = spy_benchmark.pct_change(12).shift(-12)      # spy_benchmark forward 12m return (Series)
+    stock_fwd12 = (prices.shift(-12) / prices) - 1  # (future / now) - 1
+    spy_benchmark_fwd12 = (spy_benchmark.shift(-12) / spy_benchmark) - 1   # spy_benchmark forward 12m return (Series)
     excess_fwd12 = stock_fwd12.sub(spy_benchmark_fwd12, axis=0)  # broadcast subtract by row
 
     # Classification label: excess > 0
@@ -308,13 +308,15 @@ def train(args):
         shares_lag4 = shares_qe.groupby(level=1).shift(4)
         inv_qe = (assets_qe - assets_lag4) / assets_lag4
         iss_qe = (shares_qe - shares_lag4) / shares_lag4
+        inv_qe = inv_qe.replace([np.inf, -np.inf], np.nan)
+        iss_qe = iss_qe.replace([np.inf, -np.inf], np.nan)
         if args.debug:
             check = pd.DataFrame({
                 'Date': dates,
                 'BQ_Rollback': bq_roll,
                 'Is_BQ_End': is_bqe,
             }).set_index('Date')
-            if args.debug: check.to_csv(DEBUG_DIR/"check_dates.csv", mode='x')
+            if args.debug: check.to_csv(DEBUG_DIR/"check_dates.csv", mode='w')
         # Write quarterly results back and forward-fill to months for the asset growth and netshare insurance"    
         feat_long['AssetGrowth'] = np.nan
         feat_long.loc[inv_qe.index, 'AssetGrowth'] = inv_qe
