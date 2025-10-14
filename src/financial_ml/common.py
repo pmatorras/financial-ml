@@ -10,7 +10,7 @@ SP500_MARKET_FILE = DATA_DIR/"sp500_market.csv"
 SP500_MARKET_TEST = DATA_DIR/"sp500_market_test.csv"
 SP500_FUNDA_FILE = DATA_DIR/"sp500_fundamentals.csv"
 SP500_FUNDA_TEST = DATA_DIR/"sp500_fundamentals_test.csv"
-
+PRED_FILE = DATA_DIR/"oof_predictions.csv"
 DATA_INTERVAL="1mo"
 START_STORE_DATE="1995-01-01"
 SP500_LIST_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
