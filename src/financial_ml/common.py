@@ -54,10 +54,12 @@ def get_market_file(args):
     if args.debug: csv_filenm =SP500_MARKET_DEBUG
     elif args.test: csv_filenm = SP500_MARKET_TEST
     else: csv_filenm = SP500_MARKET_FILE
+    print("opening", csv_filenm)
     return csv_filenm
 
 def get_fundamental_file(args):
     if args.debug: csv_filenm =SP500_FUNDA_DEBUG
     elif args.test: csv_filenm = SP500_FUNDA_TEST
     else: csv_filenm = SP500_FUNDA_FILE
+    print("opening", csv_filenm)
     return csv_filenm
