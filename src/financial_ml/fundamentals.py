@@ -1,11 +1,9 @@
 import time
-from io import StringIO
 import requests
 import pandas as pd
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
-import pandas as pd
 from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS, CANONICAL_CONCEPTS
 from .markets import test_subset
 
@@ -68,8 +66,7 @@ def resolve_concept(cf_json, canonical_key, compare=False):
         df = extract_tag_pit(cf_json, tax, tag, unit)
         if not df.empty:
             found.append((tax, tag, unit, df))
-            if not compare:
-                return df
+
     if not found:
         return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
 
@@ -96,7 +93,7 @@ def fetch_facts_latest_for_cik(cik, ticker, targets):
     series = [extract_tag_pit(cf, *t) for t in targets]
     series.append(resolve_concept(cf, "SharesOutstanding", compare=True))
     series_nonempty = [df for df in series if not df.empty]
-    cols = ["period_end","filed","value","metric","unit"]
+    cols = ["period_end","filed","value","metric","unit","source_taxonomy","source_tag","canonical_key"]
     facts_long = (
         pd.concat(series_nonempty, ignore_index=True)
         if series_nonempty else
