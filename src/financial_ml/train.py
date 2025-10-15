@@ -120,20 +120,17 @@ def require_non_empty(df: pd.DataFrame, name: str, min_rows: int = 1, min_cols: 
     if n_rows < min_rows or n_cols < min_cols:
         raise ValueError(f"{name} too small: shape={df.shape}, expected at least ({min_rows}, {min_cols}).")
 
-def widenVariable2(monthly, prices, canonical_key):
+def widen_by_canonical(monthly, prices, canonical_key):
     monthly["period_end"] = pd.to_datetime(monthly["period_end"], errors="coerce")
-
-    wide = (
-        monthly.loc[monthly["canonical_key"] == canonical_key,
-                   ["period_end", "ticker", "value"]]
-        .pivot(index="period_end", columns="ticker", values="value")
-        .sort_index()
-    )
-    # Align to prices shape: same index and same columns order
+    wide = (monthly.loc[monthly["canonical_key"] == canonical_key, ["period_end","ticker","value"]]
+                   .pivot(index="period_end", columns="ticker", values="value")
+                   .sort_index()
+                   .reindex(index=prices.index, columns=prices.columns))
+    print("canonical key", canonical_key,"\n-----------\n", wide)
     require_non_empty(wide, f"wide_{canonical_key}")
-    wide = wide.reindex(index=prices.index, columns=prices.columns)
-    require_non_empty(wide, "wide")
     return wide
+
+
 def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
     monthly["period_end"] = pd.to_datetime(monthly["period_end"], errors="coerce")
 
@@ -144,9 +141,11 @@ def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
             .sort_index()
     )
     # Align to prices shape: same index and same columns order
+
     require_non_empty(monthly.loc[(monthly["metric"] == m) & (monthly["unit"] == u),
                     ["period_end","ticker","value"]], m)
     wide = wide.reindex(index=prices.index, columns=prices.columns)
+    #print(wide)
     require_non_empty(wide, "wide")
     return wide
 def ensure_shares(monthly, prices):
@@ -245,18 +244,20 @@ def train(args):
         # 2) Non-share concepts by exact metric (unchanged behavior)
         input_vars = [prices, ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
         df_keys = MARKET_KEYS.copy()
-
+        print("before", df_keys)
         for tax, tag, unit in FUNDAMENTAL_VARS:
             m = f"{tax}/{tag}"
-            print(tax)
-            wide = widenVariable(monthly, prices, m, unit)
+            #print(tax, tag, unit,"\n-----------------------")
+            #wide = widenVariable(monthly, prices, m, unit)
+            #print("\n#################################")
+            wide = widen_by_canonical(prices=prices, monthly=monthly, canonical_key=tag)
             input_vars.append(wide)
             df_keys.append(tag if tag not in ("CommonStockSharesOutstanding","EntityCommonStockSharesOutstanding") else "IGNORED")
 
         # Inject the canonical shares column explicitly once
         input_vars.append(shares)
         df_keys.append("SharesOutstanding")
-
+        print("df_keys", df_keys, input_vars[8])
     input_keys=market_keys+funda_keys
     if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
@@ -344,7 +345,8 @@ def train(args):
         feat_long["BookToMarket"] = safe_div(eq,feat_long["MarketEquity"])
         feat_long["ROE"]= safe_div(netIncome,feat_long["AvgEquity"])
         feat_long["ROA"]= safe_div(netIncome,assets)
-
+        netIncome.to_csv(DEBUG_DIR/'netIncome.csv')
+        feat_long["Revenues"].to_csv(DEBUG_DIR/'revenues.csv')
         feat_long["NetMargin"]=safe_div(netIncome,feat_long["Revenues"])
         feat_long["Leverage"]=safe_div(liabilities,assets)
         if args.debug: print(feat_long.keys(), feat_long["ROE"])
@@ -381,7 +383,7 @@ def train(args):
         print(f"\nTickers dropped: {len(dropped_tickers)} out of {len(tickers_before)}")
         print(f"Sample dropped tickers: {sorted(list(dropped_tickers))[:20]}")
         print(f"Sample surviving tickers: {sorted(list(tickers_after))[:20]}")
-        
+        #exit()
         # For a few dropped tickers, show which features are NaN
         if dropped_tickers:
             sample_dropped = list(dropped_tickers)[:3]
@@ -401,7 +403,7 @@ def train(args):
         print(f"  Sample tickers: {sorted(df['ticker'].unique())[:20]}")
         
     print(f"DTE Leverage: {len(df[df['ticker']=='DTE'])} total, {df[df['ticker']=='DTE']['Leverage'].notna().sum()} non-null")
-    exit()
+    #exit()
     print("Input variables to train", input_keys)
     X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()

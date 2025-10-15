@@ -38,6 +38,7 @@ def extract_tag_pit(cf_json, taxonomy, tag, unit):
             facts = units.get(unit) or units.get(unit.capitalize())
         except KeyError:
             facts = None
+    #print(f"Available tags for {tag}:", list(cf_json['facts'].get('us-gaap', {}).keys()))
 
     if not facts:
         return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
@@ -55,10 +56,23 @@ def extract_tag_pit(cf_json, taxonomy, tag, unit):
 
 
 def dropDuplicateInfo(_df, key_cols):
-    '''Drop data when duplicated'''
-    df_last = _df.sort_values(key_cols).drop_duplicates(subset=key_cols, keep="last").sort_values(key_cols).reset_index(drop=True)
+    '''Drop data when duplicated,, keeping latest filed date'''
+     # Identify the grouping columns (exclude 'filed' if it's in key_cols)
+    group_cols = [col for col in key_cols if col != "filed"]
+    
+    # Sort by group columns + filed descending to get latest filing first
+    df_sorted = _df.sort_values(
+        group_cols + ["filed"], 
+        ascending=[True] * len(group_cols) + [False]
+    )
+    
+    # Keep first (= latest filed) for each group
+    df_dedup = df_sorted.drop_duplicates(subset=group_cols, keep="first")
+    
+    # Re-sort for clean output
+    df_last = df_dedup.sort_values(group_cols).reset_index(drop=True)
+    
     return df_last
-
 def resolve_concept(cf_json, canonical_key, compare=False):
     candidates = CANONICAL_CONCEPTS.get(canonical_key, [])
     found = []
@@ -124,6 +138,88 @@ def resolve_concept(cf_json, canonical_key, compare=False):
     out = found[0][3].copy()
     out["canonical_key"] = canonical_key
     return out
+def resolve_concept2(cf_json, canonical_key, compare=False, merge=False):
+    candidates = CANONICAL_CONCEPTS.get(canonical_key, [])
+    found = []
+    
+    for tax, tag, unit in candidates:
+        df = extract_tag_pit(cf_json, tax, tag, unit)
+        if not df.empty:
+            found.append((tax, tag, unit, df))
+    
+    if not found:
+        return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+    
+    # Special logic for Liabilities: compute from components if total missing
+    if canonical_key == "Liabilities":
+        total_df = next((d for t,g,u,d in found if g=="Liabilities"), None)
+        current_df = next((d for t,g,u,d in found if g=="LiabilitiesCurrent"), None)
+        noncurrent_df = next((d for t,g,u,d in found if g=="LiabilitiesNoncurrent"), None)
+        
+        if total_df is None and current_df is not None and noncurrent_df is not None:
+            merged = pd.merge(
+                current_df,
+                noncurrent_df,
+                on=["period_end", "filed"], how="inner",
+                suffixes=("_curr", "_noncurr")
+            )
+            
+            out = pd.DataFrame({
+                "period_end": merged["period_end"],
+                "filed": merged["filed"],
+                "value": merged["value_curr"] + merged["value_noncurr"],
+                "metric": "Liabilities",
+                "unit": "USD",
+                "source_taxonomy": "us-gaap",
+                "source_tag": "Liabilities (computed)",
+                "canonical_key": canonical_key
+            })
+            return out
+        
+        if total_df is not None:
+            out = total_df.copy()
+        elif current_df is not None:
+            out = current_df.copy()
+        else:
+            out = noncurrent_df.copy()
+        out["canonical_key"] = canonical_key
+        return out
+    
+    # Merge logic for concepts with multiple tags covering different periods
+    if merge and len(found) > 1:
+        all_dfs = [df.copy() for _, _, _, df in found]
+        combined = pd.concat(all_dfs, ignore_index=True)
+        
+        # Remove duplicates, preferring later filings
+        combined = combined.sort_values(
+            ["period_end", "filed"], 
+            ascending=[True, False]
+        ).drop_duplicates(
+            subset=["period_end"], 
+            keep="first"
+        ).sort_values("period_end")
+        
+        combined["metric"] = canonical_key
+        combined["canonical_key"] = canonical_key
+        
+        # Special comparison for SharesOutstanding
+        if compare:
+            us_df = next((df for t, _, _, df in found if t == "us-gaap"), None)
+            dei_df = next((df for t, _, _, df in found if t == "dei"), None)
+            
+            if us_df is not None and dei_df is not None:
+                uval = us_df.sort_values(["filed","period_end"]).iloc[-1]["value"]
+                dval = dei_df.sort_values(["filed","period_end"]).iloc[-1]["value"]
+                ratio = max(uval, dval) / min(uval, dval) if min(uval, dval) else float("inf")
+                if ratio > 100:
+                    print("Warning: DQC_0095-like scale mismatch for shares.")
+        
+        return combined
+    
+    # Default: return first found
+    out = found[0][3].copy()
+    out["canonical_key"] = canonical_key
+    return out
 
 def fetch_facts_latest_for_cik(cik, ticker, dict_facts):
     """
@@ -135,18 +231,21 @@ def fetch_facts_latest_for_cik(cik, ticker, dict_facts):
     # Resolve each canonical key once
     series = []
     for canon_key in requested_keys:
-        df_k = resolve_concept(cf, canon_key, compare=(canon_key == "SharesOutstanding"))
+        needs_merge = canon_key in ["Revenues", "SharesOutstanding", "NetIncomeLoss"]
+        needs_compare = canon_key == "SharesOutstanding"
+        df_k = resolve_concept2(cf, canon_key, compare=needs_compare, merge=needs_merge)
+
+        #df_k = resolve_concept(cf, canon_key, compare=(canon_key == "SharesOutstanding"))
         if not df_k.empty:
             # resolve_concept already sets the canonical_key column
             series.append(df_k)
-
     # Concatenate and deduplicate by (canonical_key, unit, period_end)
     cols = ["period_end","filed","value","metric","unit","source_taxonomy","source_tag","canonical_key"]
     facts_long = (pd.concat(series, ignore_index=True) if series else pd.DataFrame(columns=cols))
 
     # Prefer the latest filing per canonical concept/date
     facts_latest = dropDuplicateInfo(facts_long, ["canonical_key","unit","period_end","filed"])
-
+    #facts_latest = facts_long
     facts_latest["cik"] = cik
     facts_latest["ticker"] = ticker
     return facts_latest

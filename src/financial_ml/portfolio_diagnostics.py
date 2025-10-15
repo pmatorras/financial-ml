@@ -342,7 +342,7 @@ def analyze_sector_concentration(df, pred_col='y_prob', latest_date=None):
     
     top_20 = df[(df['date'] == latest_date) & (df['position'] == 1)].nlargest(20, pred_col)
     print(top_20)
-    exit()
+    #exit()
     for idx, row in top_20.iterrows():
         print(f"  {row['ticker']:>6s}: {row[pred_col]:.3f}")
     
