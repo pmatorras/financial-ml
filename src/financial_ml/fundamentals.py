@@ -128,7 +128,6 @@ def resolve_concept(cf_json, canonical_key, compare=False):
 def fetch_facts_latest_for_cik(cik, ticker, dict_facts):
     """
     Retrieve facts for one company, resolving to canonical_key for all requested concepts.
-    targets is FUNDAMENTAL_VARS from common.py (triples), but we infer canonical keys from CANONICAL_CONCEPTS.
     """
     cf = get_json(f"{BASE}/api/xbrl/companyfacts/CIK{cik}.json")
     requested_keys = list(dict_facts.keys())

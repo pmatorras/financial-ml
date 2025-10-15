@@ -1,14 +1,14 @@
 import pandas as pd, numpy as np
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from .common import SP500_MARKET_FILE, SP500_MARKET_TEST, DATA_DIR, DEBUG_DIR, FUNDAMENTAL_VARS, SP500_FUNDA_FILE, SP500_FUNDA_TEST, TEST_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
+from .common import DATA_DIR, DEBUG_DIR, FUNDAMENTAL_VARS,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS, get_market_file, get_fundamental_file
 from .models import get_models
 from pandas.tseries.offsets import BQuarterEnd
 import warnings 
 
 
 def load_market(args):
-    csv_filenm = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
+    csv_filenm =get_market_file(args)
     print("opening", csv_filenm)
     px_all = (pd.read_csv(csv_filenm, index_col=0, parse_dates=True)
                 .apply(pd.to_numeric, errors="coerce")
@@ -22,73 +22,65 @@ def load_market(args):
         import yfinance as yf
         spy = yf.download("SPY", interval="1mo", auto_adjust=True, progress=False)["Close"].reindex(px_m.index).ffill()
     return px_m, spy
-def load_fundamentals(args):
-    if args.debug: csv_filenm = DEBUG_DIR/ "funda_short.csv"
-    csv_filenm = SP500_FUNDA_TEST if args.test else SP500_FUNDA_FILE
-    print("opening", csv_filenm)
+
+def load_fundamentals(args, required_keys=None, keep_unmapped=False):
+    csv_filenm = get_fundamental_file(args)
     f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"])
-    for c in ("source_taxonomy","source_tag","canonical_key"):
-        if c not in f.columns:
-            f[c] = ""
-    f["metric"] = f["metric"].astype("string")
-    if args.debug: 
-        print(f.keys())
-        print(f.columns.tolist())
+    f['period_end'] = pd.to_datetime(f['period_end'], errors='coerce')
+    f['filed'] = pd.to_datetime(f['filed'], errors='coerce')
 
-    # Split metric into taxonomy/tag for join keys
-    f[["taxonomy", "tag"]] = f["metric"].str.split("/", n=1, expand=True)
+    # Derive taxonomy + tag robustly from metric
+    m = f['metric'].astype(str)
+    has_slash = m.str.contains('/')
+    taxonomy = m.where(has_slash, '')
+    tag = m.where(~has_slash, m.str.split('/', n=1).str[1])
+    tag = tag.where(tag.notna(), m)
+    f = f.assign(taxonomy=taxonomy, tag=tag)
 
-    # Build target map from CANONICAL_CONCEPTS
+    # Build mapping DataFrame from CANONICAL_CONCEPTS
     rows = []
-    for key, cands in CANONICAL_CONCEPTS.items():
-        for tax, tag, unit in cands:
-            rows.append({"taxonomy": tax, "tag": tag, "unit": unit, "canonical_key": key})
-    targets = pd.DataFrame(rows, columns=["taxonomy", "tag", "unit", "canonical_key"])
+    for canon_key, triples in CANONICAL_CONCEPTS.items():
+        for tax, ttag, unit in triples:
+            rows.append({'taxonomy': tax, 'tag': ttag, 'unit': unit, 'canonical_key': canon_key})
+    map_df = pd.DataFrame(rows)
 
-    # Single merge; keep explicit suffixes to control name collisions
-    f_sel = f.merge(
-        targets,
-        on=["taxonomy", "tag", "unit"],
-        how="inner",
-        suffixes=("_src", "_tgt"),
-    )
+    # Stage 1: precise match (taxonomy + tag + unit)
+    precise = f.merge(map_df, on=['taxonomy','tag','unit'], how='left', suffixes=('','_m1'))
 
-    # Pick canonical_key from targets; fallback to source if targets missing
-    if "canonical_key_tgt" in f_sel.columns and "canonical_key_src" in f_sel.columns:
-        f_sel["canonical_key"] = f_sel["canonical_key_tgt"].where(
-            f_sel["canonical_key_tgt"].notna() & (f_sel["canonical_key_tgt"] != ""),
-            f_sel["canonical_key_src"],
-        )
-        f_sel = f_sel.drop(columns=["canonical_key_src", "canonical_key_tgt"])
-    elif "canonical_key_tgt" in f_sel.columns:
-        f_sel = f_sel.rename(columns={"canonical_key_tgt": "canonical_key"})
-    # else: keep existing canonical_key if only _src exists
+    # Stage 2: fallback by tag + unit (handles plain 'Liabilities' with empty taxonomy)
+    fb_map = map_df[['tag','unit','canonical_key']].drop_duplicates()
+    fallback = f.merge(fb_map, on=['tag','unit'], how='left', suffixes=('','_m2'))
 
-    # Ensure source_* populated so downstream can reuse chosen source
-    for col, base in [("source_taxonomy", "taxonomy"), ("source_tag", "tag")]:
-        if col not in f_sel.columns:
-            f_sel[col] = f_sel[base]
-        else:
-            f_sel[col] = f_sel[col].where(f_sel[col] != "", f_sel[base])
+    # Resolve canonical_key preference: existing -> precise -> fallback
+    canon = precise['canonical_key']
+    if 'canonical_key' in f.columns:
+        canon = f['canonical_key'].where(f['canonical_key'].notna(), canon)
+    canon = canon.where(canon.notna(), fallback['canonical_key'])
 
-    # Drop helper split columns
-    f_sel = f_sel.drop(columns=["taxonomy", "tag"])
+    out = f.assign(canonical_key=canon)[
+        ['ticker','period_end','filed','unit','canonical_key','value','metric','taxonomy','tag']
+    ].sort_values(['ticker','canonical_key','period_end','filed'])
+
+    if required_keys is not None:
+        out = out[out['canonical_key'].isin(set(required_keys))]
+    if not keep_unmapped:
+        out = out[out['canonical_key'].notna()]
 
     if args.debug:
-        print(f_sel.columns.tolist())
+        print(out.columns.tolist())
 
-    if args.debug: f_sel.to_csv(DEBUG_DIR/"fsel.csv")
-    return f_sel
+    if args.debug: out.to_csv(DEBUG_DIR/"fsel.csv")
+    return out
 
 def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
     """
     Minimal monthly duplication by period_end:
-    - Groups by (ticker, metric, unit)
+    - Groups by (ticker, metric, unit, canonical_key)
     - Resamples at monthly frequency on period_end
     - Forward-fills to duplicate values between quarter ends
     - ADDS LAG to simulate reporting delay
     """
-    gcols = ["ticker", "metric", "unit"]
+    gcols = ["ticker", "metric", "unit", "canonical_key"]  # <-- ADD canonical_key here
 
     #remove duplicates, keep the last filing
     df_clean = (
@@ -97,21 +89,21 @@ def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
             period_end=pd.to_datetime(df["period_end"], errors="coerce", utc=True).dt.tz_convert(None),
             filed=pd.to_datetime(df["filed"], errors="coerce", utc=True).dt.tz_convert(None)
         )
-        .sort_values(gcols + ["filed", "period_end"])  # Sort by filed date
-        .drop_duplicates(subset=gcols + ["filed"], keep="last")  # Keep last if duplicate
+        .sort_values(gcols + ["filed", "period_end"])
+        .drop_duplicates(subset=gcols + ["filed"], keep="last")
     )
+    
     out = (
         df_clean.copy()
           .assign(filed=pd.to_datetime(df["filed"], errors="coerce", utc=True).dt.tz_convert(None))
           .sort_values(gcols + ["filed"])
           .set_index("filed")
-          .groupby(gcols)["value"]
+          .groupby(gcols, dropna=False)["value"]
           .resample(freq)
           .ffill()
           .rename("value")
           .reset_index()
           .rename(columns={"filed": "period_end"})  
-
     )
 
     if maxdate is not None:
@@ -119,6 +111,7 @@ def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
         out = out[out["period_end"] <= maxdate]
 
     return out
+
 def require_non_empty(df: pd.DataFrame, name: str, min_rows: int = 1, min_cols: int = 1):
     # .empty is True if any axis has length 0; still False when all-NaN rows exist
     if df is None or df.empty:
@@ -127,6 +120,20 @@ def require_non_empty(df: pd.DataFrame, name: str, min_rows: int = 1, min_cols: 
     if n_rows < min_rows or n_cols < min_cols:
         raise ValueError(f"{name} too small: shape={df.shape}, expected at least ({min_rows}, {min_cols}).")
 
+def widenVariable2(monthly, prices, canonical_key):
+    monthly["period_end"] = pd.to_datetime(monthly["period_end"], errors="coerce")
+
+    wide = (
+        monthly.loc[monthly["canonical_key"] == canonical_key,
+                   ["period_end", "ticker", "value"]]
+        .pivot(index="period_end", columns="ticker", values="value")
+        .sort_index()
+    )
+    # Align to prices shape: same index and same columns order
+    require_non_empty(wide, f"wide_{canonical_key}")
+    wide = wide.reindex(index=prices.index, columns=prices.columns)
+    require_non_empty(wide, "wide")
+    return wide
 def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
     monthly["period_end"] = pd.to_datetime(monthly["period_end"], errors="coerce")
 
@@ -142,7 +149,6 @@ def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
     wide = wide.reindex(index=prices.index, columns=prices.columns)
     require_non_empty(wide, "wide")
     return wide
-
 def ensure_shares(monthly, prices):
     # Accept both aliases explicitly via metric
     share_metrics = {
@@ -242,6 +248,7 @@ def train(args):
 
         for tax, tag, unit in FUNDAMENTAL_VARS:
             m = f"{tax}/{tag}"
+            print(tax)
             wide = widenVariable(monthly, prices, m, unit)
             input_vars.append(wide)
             df_keys.append(tag if tag not in ("CommonStockSharesOutstanding","EntityCommonStockSharesOutstanding") else "IGNORED")
@@ -344,8 +351,10 @@ def train(args):
 
     #Add the Y to the datafrane
     y_long = y.stack().rename("y")
-
-    df = feat_long.join(y_long, how="inner").dropna()
+    df = feat_long.join(y_long, how="inner")
+    print(f"before first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
+    #df = df.dropna()
+    print(f"After first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
     require_non_empty(df, "feat_join_ylong")
     # Train/validation split: expanding window via TimeSeriesSplit
     df = df.reset_index()
@@ -357,7 +366,42 @@ def train(args):
     require_non_empty(df, "df_sorted")
     # Optional: ensure no NaNs remain in features/label before splitting
 
+
+    # Show which features in input_keys have the most NaN
+    print("\nNaN counts in input_keys:")
+    nan_in_input_keys = df[input_keys].isnull().sum().sort_values(ascending=False)
+    print(nan_in_input_keys[nan_in_input_keys > 0])
+
+    # Show which tickers are getting dropped
+    if 'ticker' in df.columns:
+        tickers_before = set(df['ticker'].unique())
+        df_after = df.dropna(subset=input_keys)
+        tickers_after = set(df_after['ticker'].unique())
+        dropped_tickers = tickers_before - tickers_after
+        print(f"\nTickers dropped: {len(dropped_tickers)} out of {len(tickers_before)}")
+        print(f"Sample dropped tickers: {sorted(list(dropped_tickers))[:20]}")
+        print(f"Sample surviving tickers: {sorted(list(tickers_after))[:20]}")
+        
+        # For a few dropped tickers, show which features are NaN
+        if dropped_tickers:
+            sample_dropped = list(dropped_tickers)[:3]
+            print(f"\nWhy these tickers were dropped:")
+            for ticker in sample_dropped:
+                ticker_rows = df[df['ticker'] == ticker]
+                missing_features = ticker_rows[input_keys].isnull().sum()
+                missing_features = missing_features[missing_features > 0]
+                print(f"  {ticker}: missing {len(missing_features)} features")
+                print(f"    {missing_features.head(10).to_dict()}")
+
+
     df = df.dropna(subset=input_keys)
+    print(f"\nafter second dropna: {len(df)} rows")
+    if 'ticker' in df.columns:
+        print(f"  Unique tickers: {df['ticker'].nunique()}")
+        print(f"  Sample tickers: {sorted(df['ticker'].unique())[:20]}")
+        
+    print(f"DTE Leverage: {len(df[df['ticker']=='DTE'])} total, {df[df['ticker']=='DTE']['Leverage'].notna().sum()} non-null")
+    exit()
     print("Input variables to train", input_keys)
     X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()

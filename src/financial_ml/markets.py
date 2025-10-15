@@ -4,7 +4,7 @@ import requests, argparse, os
 from io import StringIO
 import pandas as pd
 import warnings
-from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL, DEBUG_SYMBOLS, get_market_file
+from .common import SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL, DEBUG_SYMBOLS, get_market_file
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
 def test_subset(df, args):
     if args.debug:
