@@ -11,12 +11,6 @@ def build_sanitize():
 def get_models():
     sanitize = build_sanitize()
     models = {
-        "logreg_l2": Pipeline([
-            ("sanitize", sanitize),                    # replace ±inf with NaN
-            ("impute", SimpleImputer(strategy="median")),  # handle NaN
-            ("scale", StandardScaler()),
-            ("clf", LogisticRegression(max_iter=2000, C=1.0, class_weight="balanced"))
-        ]),
         "logreg_l1": Pipeline([
             ("sanitize", sanitize),                    # replace ±inf with NaN
             ("impute", SimpleImputer(strategy="median")),  # handle NaN
@@ -25,6 +19,13 @@ def get_models():
                                     C=0.5, max_iter=5000, class_weight="balanced"))
         ])
         ,
+        "logreg_l2": Pipeline([
+            ("sanitize", sanitize),                    # replace ±inf with NaN
+            ("impute", SimpleImputer(strategy="median")),  # handle NaN
+            ("scale", StandardScaler()),
+            ("clf", LogisticRegression(max_iter=2000, C=1.0, class_weight="balanced"))
+        ]),
+
         "rf": Pipeline([
             ("sanitize", sanitize),                    # replace ±inf with NaN
             ("impute", SimpleImputer(strategy="median")),  # handle NaN
