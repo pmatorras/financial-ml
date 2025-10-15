@@ -4,7 +4,7 @@ import pandas as pd
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
-from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS, CANONICAL_CONCEPTS
+from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS, CANONICAL_CONCEPTS, SP500_FUNDA_DEBUG, get_fundamental_file
 from .markets import test_subset
 
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
@@ -69,6 +69,45 @@ def resolve_concept(cf_json, canonical_key, compare=False):
 
     if not found:
         return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+    # Special logic for Liabilities: compute from components if total missing
+    print(candidates, canonical_key)
+    if canonical_key == "Liabilities":
+        print("im in")
+        total_df = next((d for t,g,u,d in found if g=="Liabilities"), None)
+        current_df = next((d for t,g,u,d in found if g=="LiabilitiesCurrent"), None)
+        noncurrent_df = next((d for t,g,u,d in found if g=="LiabilitiesNoncurrent"), None)
+        
+        if total_df is None and current_df is not None and noncurrent_df is not None:
+            # Merge on period_end and filed, sum the values
+            merged = pd.merge(
+                current_df, 
+                noncurrent_df, 
+                on=["period_end", "filed"], how="inner",
+                suffixes=("_curr", "_noncurr")
+            )
+            
+            out = pd.DataFrame({
+                "period_end": merged["period_end"],
+                "filed": merged["filed"],
+                "value": merged["value_curr"] + merged["value_noncurr"],
+                "metric": "Liabilities",
+                "unit": "USD",
+                "source_taxonomy": "us-gaap",
+                "source_tag": "Liabilities (computed)",
+                "canonical_key": canonical_key
+            })
+            return out
+        
+        # Otherwise return total if available, or fallback to current
+        if total_df is not None:
+            out = total_df.copy()
+        elif current_df is not None:
+            out = current_df.copy()
+        else:
+            out = noncurrent_df.copy()
+        
+        out["canonical_key"] = canonical_key
+        return out
 
     if compare and len(found) > 1 and canonical_key == "SharesOutstanding":
         us_df = next((d for t,g,u,d in found if t=="us-gaap"), None)
@@ -87,11 +126,13 @@ def resolve_concept(cf_json, canonical_key, compare=False):
     out = found[0][3].copy()
     out["canonical_key"] = canonical_key
     return out
+
 def fetch_facts_latest_for_cik(cik, ticker, targets):
     '''Retrieve each fundamentals for each company, using the SEC data'''
     cf = get_json(f"{BASE}/api/xbrl/companyfacts/CIK{cik}.json")
     series = [extract_tag_pit(cf, *t) for t in targets]
     series.append(resolve_concept(cf, "SharesOutstanding", compare=True))
+    series.append(resolve_concept(cf, "Liabilities", compare=True))
     series_nonempty = [df for df in series if not df.empty]
     cols = ["period_end","filed","value","metric","unit","source_taxonomy","source_tag","canonical_key"]
     facts_long = (
@@ -107,7 +148,6 @@ def fetch_facts_latest_for_cik(cik, ticker, targets):
 
 def fundamentals(args):
     '''Retrieve sp500 information from markets.py, and obtain the fundamentals for these'''
-    print(SP500_NAMES_FILE)
     df_all = pd.read_csv(SP500_NAMES_FILE)
     df=test_subset(df_all,args)
     pairs = list(
@@ -117,14 +157,13 @@ def fundamentals(args):
     )
 
     universe = [ (cik, sym) for cik, sym in pairs ]
-    fundamentals_file= SP500_FUNDA_TEST if args.test else SP500_FUNDA_FILE
-    #universe = [("0000066740","MMM"), ("0000320193","AAPL"), ("0000789019","MSFT")]; fundamentals_file="test_funda.csv" #Save this in case an even shorter test
+    fundamentals_file= get_fundamental_file(args)
     nstocks = len(universe)
     print(f"Processing {nstocks} stocks")
     all_facts = []
+    print(universe)
     for i, (cik, ticker) in enumerate(universe, start=1):
         print(f"{i}/{nstocks}: {ticker}")
-        #if "AEP" not in ticker: continue
         try:
             df_i = fetch_facts_latest_for_cik(cik, ticker, FUNDAMENTAL_VARS)
             all_facts.append(df_i)
