@@ -4,7 +4,7 @@ import pandas as pd
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
-from .common import SP500_NAMES_FILE, SP500_FUNDA_FILE,SP500_FUNDA_TEST, FUNDAMENTAL_VARS, CANONICAL_CONCEPTS, SP500_FUNDA_DEBUG, get_fundamental_file
+from .common import SP500_NAMES_FILE, CANONICAL_CONCEPTS, get_fundamental_file
 from .markets import test_subset
 
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
@@ -70,9 +70,7 @@ def resolve_concept(cf_json, canonical_key, compare=False):
     if not found:
         return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
     # Special logic for Liabilities: compute from components if total missing
-    print(candidates, canonical_key)
     if canonical_key == "Liabilities":
-        print("im in")
         total_df = next((d for t,g,u,d in found if g=="Liabilities"), None)
         current_df = next((d for t,g,u,d in found if g=="LiabilitiesCurrent"), None)
         noncurrent_df = next((d for t,g,u,d in found if g=="LiabilitiesNoncurrent"), None)
@@ -127,20 +125,29 @@ def resolve_concept(cf_json, canonical_key, compare=False):
     out["canonical_key"] = canonical_key
     return out
 
-def fetch_facts_latest_for_cik(cik, ticker, targets):
-    '''Retrieve each fundamentals for each company, using the SEC data'''
+def fetch_facts_latest_for_cik(cik, ticker, dict_facts):
+    """
+    Retrieve facts for one company, resolving to canonical_key for all requested concepts.
+    targets is FUNDAMENTAL_VARS from common.py (triples), but we infer canonical keys from CANONICAL_CONCEPTS.
+    """
     cf = get_json(f"{BASE}/api/xbrl/companyfacts/CIK{cik}.json")
-    series = [extract_tag_pit(cf, *t) for t in targets]
-    series.append(resolve_concept(cf, "SharesOutstanding", compare=True))
-    series.append(resolve_concept(cf, "Liabilities", compare=True))
-    series_nonempty = [df for df in series if not df.empty]
+    requested_keys = list(dict_facts.keys())
+
+    # Resolve each canonical key once
+    series = []
+    for canon_key in requested_keys:
+        df_k = resolve_concept(cf, canon_key, compare=(canon_key == "SharesOutstanding"))
+        if not df_k.empty:
+            # resolve_concept already sets the canonical_key column
+            series.append(df_k)
+
+    # Concatenate and deduplicate by (canonical_key, unit, period_end)
     cols = ["period_end","filed","value","metric","unit","source_taxonomy","source_tag","canonical_key"]
-    facts_long = (
-        pd.concat(series_nonempty, ignore_index=True)
-        if series_nonempty else
-        pd.DataFrame(columns=cols)
-    )
-    facts_latest = dropDuplicateInfo(facts_long, ["metric","unit","period_end"])
+    facts_long = (pd.concat(series, ignore_index=True) if series else pd.DataFrame(columns=cols))
+
+    # Prefer the latest filing per canonical concept/date
+    facts_latest = dropDuplicateInfo(facts_long, ["canonical_key","unit","period_end","filed"])
+
     facts_latest["cik"] = cik
     facts_latest["ticker"] = ticker
     return facts_latest
@@ -161,11 +168,10 @@ def fundamentals(args):
     nstocks = len(universe)
     print(f"Processing {nstocks} stocks")
     all_facts = []
-    print(universe)
     for i, (cik, ticker) in enumerate(universe, start=1):
         print(f"{i}/{nstocks}: {ticker}")
         try:
-            df_i = fetch_facts_latest_for_cik(cik, ticker, FUNDAMENTAL_VARS)
+            df_i = fetch_facts_latest_for_cik(cik, ticker, CANONICAL_CONCEPTS)
             all_facts.append(df_i)
         except Exception as e:
             print(f"skip {cik} {ticker}: {e}")
