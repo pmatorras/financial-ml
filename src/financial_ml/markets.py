@@ -4,10 +4,15 @@ import requests, argparse, os
 from io import StringIO
 import pandas as pd
 import warnings
-from .common import SP500_MARKET_TEST,SP500_MARKET_FILE,SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL
+from financial_ml.utils.config import SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL, DEBUG_SYMBOLS 
+from financial_ml.utils.paths import get_market_file
+
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
 def test_subset(df, args):
-    if args.test: 
+    if args.debug:
+        print(f"returning the following symbols :{DEBUG_SYMBOLS}")
+        return(df[df['Symbol'].isin(DEBUG_SYMBOLS)])
+    elif args.test: 
         print("returning only test subset")
         return df.sort_values('Date added').head(50)
     else:
@@ -69,7 +74,7 @@ def add_SPY(tickers):
 def store_info(args):
     spx = fetch_sp500_list(SP500_NAMES_FILE, args, SP500_LIST_URL, headers)
     tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
-    sp500_marketfile = SP500_MARKET_TEST if args.test else SP500_MARKET_FILE
+    sp500_marketfile = get_market_file(args)
     all_tickers = add_SPY(tickers)
     fetch_sp500_marketdata(sp500_marketfile, all_tickers, args.newinfo)
 
