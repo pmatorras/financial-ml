@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from financial_ml.common import DATA_DIR, SP500_MARKET_FILE, FIGURE_DIR, get_prediction_file
+from financial_ml.utils.paths import get_market_file, get_prediction_file
+from financial_ml.utils.config import FIGURE_DIR
 from financial_ml.models import get_models
 from financial_ml.portfolio_diagnostics import *
 
@@ -152,7 +153,8 @@ def portfolio_construction(args):
     preds_nm = get_prediction_file(args)
     preds = pd.read_csv(preds_nm)
     preds['date'] = pd.to_datetime(preds['date'])
-    prices = pd.read_csv(SP500_MARKET_FILE, index_col=0, parse_dates=True).ffill()
+    prices_file = get_market_file(args)
+    prices = pd.read_csv(prices_file, index_col=0, parse_dates=True).ffill()
     spy = prices['SPY'] if 'SPY' in prices.columns else None
     prices = prices.drop(columns=['SPY'], errors='ignore')
 

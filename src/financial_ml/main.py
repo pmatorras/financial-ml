@@ -2,7 +2,7 @@ import argparse
 from financial_ml.markets import store_info
 from financial_ml.train import train
 from financial_ml.fundamentals import fundamentals
-from financial_ml.common import createFolders
+from financial_ml.utils.paths import createFolders
 from financial_ml.portfolio_construction import portfolio_construction
 def cli():
     parser = argparse.ArgumentParser(prog="financial_ml",

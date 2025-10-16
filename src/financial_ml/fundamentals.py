@@ -3,9 +3,9 @@ import requests
 import pandas as pd
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import os
-from .common import SP500_NAMES_FILE, CANONICAL_CONCEPTS, get_fundamental_file
-from .markets import test_subset
+from financial_ml.utils.config import SP500_NAMES_FILE, CANONICAL_CONCEPTS
+from financial_ml.utils.paths import get_fundamental_file
+from financial_ml.markets import test_subset
 
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
 UA = "ResearchBot/1.0 (contact@example.com)"  

@@ -1,7 +1,9 @@
 import pandas as pd, numpy as np
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from financial_ml.common import DATA_DIR, DEBUG_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS, get_market_file, get_fundamental_file,get_prediction_file
+from financial_ml.utils.config import DEBUG_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
+from financial_ml.utils.paths import get_market_file, get_fundamental_file,get_prediction_file
+from financial_ml.utils.helpers import safe_div
 from financial_ml.models import get_models
 from pandas.tseries.offsets import BQuarterEnd
 import warnings 
@@ -22,7 +24,8 @@ def load_market(args):
         import yfinance as yf
         spy = yf.download("SPY", interval="1mo", auto_adjust=True, progress=False)["Close"].reindex(px_m.index).ffill()
     return px_m, spy
-def load_fundamentals2(args, required_keys=None, keep_unmapped=False):
+
+def load_fundamentals(args, required_keys=None, keep_unmapped=False):
     csv_filenm = get_fundamental_file(args)
     f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"])
     f['period_end'] = pd.to_datetime(f['period_end'], errors='coerce')
@@ -181,13 +184,6 @@ def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") ->
 
     return out
 
-def safe_div(numer, denom):
-    #return nan if negative/zero denominators
-    numer = pd.to_numeric(numer, errors="coerce")
-    denom = pd.to_numeric(denom, errors="coerce")
-    out = numer / denom
-    return out.where((denom > 0) & np.isfinite(out))
-
 
 
 def train(args):
@@ -211,7 +207,7 @@ def train(args):
 
     if args.use_fundamentals:
         funda_keys = FUNDA_KEYS
-        fundamentals = load_fundamentals2(args)
+        fundamentals = load_fundamentals(args)
         if args.debug: fundamentals.to_csv(DEBUG_DIR/"funda.csv")
         monthly = to_monthly_ffill(fundamentals, maxdate="2025-12-31", freq="BME")
         if args.debug: monthly.to_csv(DEBUG_DIR/"monthly.csv")
