@@ -1,8 +1,8 @@
 import pandas as pd, numpy as np
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from .common import DATA_DIR, DEBUG_DIR, FUNDAMENTAL_VARS,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS, get_market_file, get_fundamental_file
-from .models import get_models
+from financial_ml.common import DATA_DIR, DEBUG_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS, get_market_file, get_fundamental_file,get_prediction_file
+from financial_ml.models import get_models
 from pandas.tseries.offsets import BQuarterEnd
 import warnings 
 
@@ -22,57 +22,29 @@ def load_market(args):
         import yfinance as yf
         spy = yf.download("SPY", interval="1mo", auto_adjust=True, progress=False)["Close"].reindex(px_m.index).ffill()
     return px_m, spy
-
-def load_fundamentals(args, required_keys=None, keep_unmapped=False):
+def load_fundamentals2(args, required_keys=None, keep_unmapped=False):
     csv_filenm = get_fundamental_file(args)
     f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"])
     f['period_end'] = pd.to_datetime(f['period_end'], errors='coerce')
     f['filed'] = pd.to_datetime(f['filed'], errors='coerce')
 
-    # Derive taxonomy + tag robustly from metric
-    m = f['metric'].astype(str)
-    has_slash = m.str.contains('/')
-    taxonomy = m.where(has_slash, '')
-    tag = m.where(~has_slash, m.str.split('/', n=1).str[1])
-    tag = tag.where(tag.notna(), m)
-    f = f.assign(taxonomy=taxonomy, tag=tag)
-
-    # Build mapping DataFrame from CANONICAL_CONCEPTS
-    rows = []
-    for canon_key, triples in CANONICAL_CONCEPTS.items():
-        for tax, ttag, unit in triples:
-            rows.append({'taxonomy': tax, 'tag': ttag, 'unit': unit, 'canonical_key': canon_key})
-    map_df = pd.DataFrame(rows)
-
-    # Stage 1: precise match (taxonomy + tag + unit)
-    precise = f.merge(map_df, on=['taxonomy','tag','unit'], how='left', suffixes=('','_m1'))
-
-    # Stage 2: fallback by tag + unit (handles plain 'Liabilities' with empty taxonomy)
-    fb_map = map_df[['tag','unit','canonical_key']].drop_duplicates()
-    fallback = f.merge(fb_map, on=['tag','unit'], how='left', suffixes=('','_m2'))
-
-    # Resolve canonical_key preference: existing -> precise -> fallback
-    canon = precise['canonical_key']
+    # If canonical_key already exists in CSV, use it directly
     if 'canonical_key' in f.columns:
-        canon = f['canonical_key'].where(f['canonical_key'].notna(), canon)
-    canon = canon.where(canon.notna(), fallback['canonical_key'])
+        out = f[['ticker','period_end','filed','unit','canonical_key','value','metric']].copy()
+        out = out.sort_values(['ticker','canonical_key','period_end','filed'])
+        
+        if required_keys is not None:
+            out = out[out['canonical_key'].isin(set(required_keys))]
+        if not keep_unmapped:
+            out = out[out['canonical_key'].notna()]
+        
+        if args.debug: 
+            print(out.columns.tolist())
+            out.to_csv(DEBUG_DIR/"fsel.csv")
+        
+        return out
 
-    out = f.assign(canonical_key=canon)[
-        ['ticker','period_end','filed','unit','canonical_key','value','metric','taxonomy','tag']
-    ].sort_values(['ticker','canonical_key','period_end','filed'])
-
-    if required_keys is not None:
-        out = out[out['canonical_key'].isin(set(required_keys))]
-    if not keep_unmapped:
-        out = out[out['canonical_key'].notna()]
-
-    if args.debug:
-        print(out.columns.tolist())
-
-    if args.debug: out.to_csv(DEBUG_DIR/"fsel.csv")
-    return out
-
-def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
+def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=1):
     """
     Minimal monthly duplication by period_end:
     - Groups by (ticker, metric, unit, canonical_key)
@@ -80,7 +52,7 @@ def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
     - Forward-fills to duplicate values between quarter ends
     - ADDS LAG to simulate reporting delay
     """
-    gcols = ["ticker", "metric", "unit", "canonical_key"]  # <-- ADD canonical_key here
+    gcols = ["ticker", "metric", "unit", "canonical_key"]
 
     #remove duplicates, keep the last filing
     df_clean = (
@@ -92,7 +64,11 @@ def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
         .sort_values(gcols + ["filed", "period_end"])
         .drop_duplicates(subset=gcols + ["filed"], keep="last")
     )
-    
+    # Add configurable lag
+    if lag_months > 0:
+        df_clean = df_clean.assign(
+            filed=lambda x: x['filed'] + pd.DateOffset(months=lag_months)
+        )
     out = (
         df_clean.copy()
           .assign(filed=pd.to_datetime(df["filed"], errors="coerce", utc=True).dt.tz_convert(None))
@@ -105,12 +81,14 @@ def to_monthly_ffill(df, maxdate=None, freq="BM", lag_months=2):
           .reset_index()
           .rename(columns={"filed": "period_end"})  
     )
-
+    out = (out.sort_values(["ticker", "canonical_key", "period_end"])
+              .drop_duplicates(subset=["ticker", "canonical_key", "period_end"], keep="last")
+              .reset_index(drop=True))
     if maxdate is not None:
         maxdate = pd.to_datetime(maxdate)
         out = out[out["period_end"] <= maxdate]
 
-    return out
+    return out.drop_duplicates(subset=gcols + ['period_end'], keep='last')
 
 def require_non_empty(df: pd.DataFrame, name: str, min_rows: int = 1, min_cols: int = 1):
     # .empty is True if any axis has length 0; still False when all-NaN rows exist
@@ -126,7 +104,6 @@ def widen_by_canonical(monthly, prices, canonical_key):
                    .pivot(index="period_end", columns="ticker", values="value")
                    .sort_index()
                    .reindex(index=prices.index, columns=prices.columns))
-    print("canonical key", canonical_key,"\n-----------\n", wide)
     require_non_empty(wide, f"wide_{canonical_key}")
     return wide
 
@@ -148,26 +125,29 @@ def widenVariable(monthly, prices, m="us-gaap/Assets", u="USD"):
     #print(wide)
     require_non_empty(wide, "wide")
     return wide
+
 def ensure_shares(monthly, prices):
-    # Accept both aliases explicitly via metric
     share_metrics = {
-        "us-gaap/CommonStockSharesOutstanding",
-        "dei/EntityCommonStockSharesOutstanding",
+        "CommonStockSharesOutstanding"
     }
 
     shares = (
         monthly.loc[
-            monthly["metric"].isin(share_metrics),
+            monthly["canonical_key"].isin(share_metrics),
             ["period_end", "ticker", "metric", "unit", "value"],
         ]
         .sort_values(["ticker", "period_end", "metric"])
-        .drop_duplicates(subset=["ticker", "period_end"], keep="last")  # prefer later metric if both present
+        .drop_duplicates(subset=["ticker", "period_end"], keep="last")
         .pivot(index="period_end", columns="ticker", values="value")
-        .reindex(index=prices.index, columns=prices.columns)
     )
+    
+    # Convert timezone-aware index to timezone-naive to match prices
+    shares.index = shares.index.tz_localize(None)
+    
+    shares = shares.reindex(index=prices.index, columns=prices.columns)
 
-    # Ensure numeric
     return pd.to_numeric(shares.stack(), errors="coerce").unstack()
+
 def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") -> pd.Series:
     '''
     Function to deal with sometimes empty mkcap values.
@@ -231,33 +211,23 @@ def train(args):
 
     if args.use_fundamentals:
         funda_keys = FUNDA_KEYS
-        fundamentals = load_fundamentals(args)
+        fundamentals = load_fundamentals2(args)
         if args.debug: fundamentals.to_csv(DEBUG_DIR/"funda.csv")
         monthly = to_monthly_ffill(fundamentals, maxdate="2025-12-31", freq="BME")
         if args.debug: monthly.to_csv(DEBUG_DIR/"monthly.csv")
-        require_non_empty(monthly, "monthly")
-        shares = ensure_shares(monthly, prices)
+        #require_non_empty(monthly, "monthly")
+        shares = monthly# ensure_shares(monthly, prices)
         if args.debug: shares.to_csv(DEBUG_DIR/"shares.csv")
-        require_non_empty(shares, "SharesOutstanding")
-        shares.name = "SharesOutstanding"
-
+        #exit()
+        require_non_empty(shares, "CommonStockSharesOutstanding")
+        shares.name = "CommonStockSharesOutstanding"
         # 2) Non-share concepts by exact metric (unchanged behavior)
         input_vars = [prices, ret_1m, ret_12m, mom_12_1, vol_3m, vol_12m]
         df_keys = MARKET_KEYS.copy()
-        print("before", df_keys)
-        for tax, tag, unit in FUNDAMENTAL_VARS:
-            m = f"{tax}/{tag}"
-            #print(tax, tag, unit,"\n-----------------------")
-            #wide = widenVariable(monthly, prices, m, unit)
-            #print("\n#################################")
+        for tag in CANONICAL_CONCEPTS:
             wide = widen_by_canonical(prices=prices, monthly=monthly, canonical_key=tag)
             input_vars.append(wide)
-            df_keys.append(tag if tag not in ("CommonStockSharesOutstanding","EntityCommonStockSharesOutstanding") else "IGNORED")
-
-        # Inject the canonical shares column explicitly once
-        input_vars.append(shares)
-        df_keys.append("SharesOutstanding")
-        print("df_keys", df_keys, input_vars[8])
+            df_keys.append(tag)
     input_keys=market_keys+funda_keys
     if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
@@ -287,8 +257,7 @@ def train(args):
     if args.use_fundamentals:
         price = feat_long["ClosePrice"].astype(float)
         if args.debug: feat_long.to_csv(DEBUG_DIR/"feat_long.csv")
-        #n_shares = feat_long['us-gaap/CommonStockSharesOutstanding'].astype(float)
-        n_shares = feat_long["SharesOutstanding"].astype(float)
+        n_shares = feat_long["CommonStockSharesOutstanding"].astype(float)
         if args.debug: n_shares.to_csv(DEBUG_DIR/"nshares.csv")
         liabilities = feat_long["Liabilities"].astype(float)
         assets = feat_long["Assets"].astype(float)
@@ -304,7 +273,7 @@ def train(args):
             n_shares,
             name='LogMktCap'
 )
-
+        feat_long['LogMktCap'].to_csv(DEBUG_DIR/'mkap.csv')
         dates = pd.Series(feat_long.index.get_level_values('Date'))
         is_bqe = (dates == pd.DatetimeIndex([BQuarterEnd().rollback(d) for d in dates])).values
         bq_roll = pd.DatetimeIndex([BQuarterEnd().rollback(d) for d in dates])
@@ -355,7 +324,7 @@ def train(args):
     y_long = y.stack().rename("y")
     df = feat_long.join(y_long, how="inner")
     print(f"before first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
-    #df = df.dropna()
+    df = df.dropna()
     print(f"After first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
     require_non_empty(df, "feat_join_ylong")
     # Train/validation split: expanding window via TimeSeriesSplit
@@ -463,7 +432,7 @@ def train(args):
         print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, 3).tolist())
 
     pred_df = pd.concat(pred_rows, ignore_index=True)
-    predpath = DATA_DIR/"oof_predictions.csv"
+    predpath = get_prediction_file(args)
     pred_df.to_csv(predpath, index=False)
 
     from financial_ml.feature_importance import analyze_feature_importance

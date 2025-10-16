@@ -1,8 +1,9 @@
 import argparse
-from .markets import store_info
-from .train import train
-from .fundamentals import fundamentals
-from .common import createFolders
+from financial_ml.markets import store_info
+from financial_ml.train import train
+from financial_ml.fundamentals import fundamentals
+from financial_ml.common import createFolders
+from financial_ml.portfolio_construction import portfolio_construction
 def cli():
     parser = argparse.ArgumentParser(prog="financial_ml",
                                      description="S&P 500 data pipeline: fetch, fundamentals, train")
@@ -16,13 +17,16 @@ def cli():
     p_info.add_argument("--newinfo", "-ni", action="store_true", help="Refresh historical market data")
 
     p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
-    # add funda-specific options if any
 
     p_train = sub.add_parser("train", help="Train models")
     p_train.add_argument("--use-fundamentals", action="store_true",
                          help="Include fundamentals in training features")
+    
+    p_portfolio = sub.add_parser("portfolio", help="Create portfolio")
+    p_portfolio.add_argument("--model", "-m", help="chose ml to display", type=str, default='rf', choices= ["logreg_l1", "logreg_l2", "rf"])
+
     #ensure --test --debug can go anywhere
-    for sp in (p_info, p_funda, p_train):
+    for sp in (p_info, p_funda, p_train, p_portfolio):
         sp.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
 
@@ -46,4 +50,7 @@ def main(argv=None):
     elif args.cmd == "train":
         print("Performing training")
         train(args)
+    elif args.cmd == "portfolio":
+        print("Getting portfolio")
+        portfolio_construction(args)
     return 0

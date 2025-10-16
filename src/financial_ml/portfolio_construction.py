@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from financial_ml.common import DATA_DIR, PRED_FILE, SP500_MARKET_FILE, FIGURE_DIR
+from financial_ml.common import DATA_DIR, SP500_MARKET_FILE, FIGURE_DIR, get_prediction_file
 from financial_ml.models import get_models
 from financial_ml.portfolio_diagnostics import *
 
@@ -117,11 +117,11 @@ def draw_cumulative_drawdown(portfolio_returns,spy, drawdown, max_drawdown, mode
     axes[1].grid(alpha=0.3)
 
     plt.tight_layout()
-    figname = FIGURE_DIR / f"portfolio_backtest_{model}"
-    plt.savefig('figures/portfolio_backtest.png', dpi=300, bbox_inches='tight')
+    figname = FIGURE_DIR / f"portfolio_backtest_{model}.png"
+    plt.savefig(figname, dpi=300, bbox_inches='tight')
     #plt.show()
 
-    print("\nChart saved to figures/portfolio_backtest.png")
+    print(f"\nChart saved to {figname}")
 
 def include_benchmark_return(spy, portfolio_returns):
     # Benchmark (SPY buy-and-hold)
@@ -147,7 +147,10 @@ def include_benchmark_return(spy, portfolio_returns):
 
 def portfolio_construction(args):
     # Load Data for predictions, stocks, and SPY benchmark
-    preds = pd.read_csv(PRED_FILE)
+    model = args.model
+    print("making calculations for", model)
+    preds_nm = get_prediction_file(args)
+    preds = pd.read_csv(preds_nm)
     preds['date'] = pd.to_datetime(preds['date'])
     prices = pd.read_csv(SP500_MARKET_FILE, index_col=0, parse_dates=True).ffill()
     spy = prices['SPY'] if 'SPY' in prices.columns else None
@@ -164,7 +167,7 @@ def portfolio_construction(args):
     print_model_agreement(df, models)
     compare_model_performance_by_period(preds, returns_realized)
     # Filter to best model (Logistic L2)
-    df = df[df['model'] == 'rf'].copy()
+    df = df[df['model'] == model].copy()
     df = smooth_predictions(df, window=3)
 
     print("\n=== PREDICTIONS DATA ===")
@@ -226,7 +229,6 @@ def portfolio_construction(args):
     # Win Rate
     win_rate = (portfolio_returns['portfolio_return'] > 0).sum() / len(portfolio_returns)
 
-    from financial_ml.portfolio_diagnostics import test_sharpe_significance
 
     test_sharpe_significance(portfolio_returns=portfolio_returns, sharpe_ratio=sharpe_ratio)
 
@@ -242,8 +244,4 @@ def portfolio_construction(args):
     print(f"Total Return:        {(portfolio_returns['cum_return'].iloc[-1] - 1):.1%}")
     print("=" * 60)
 
-    draw_cumulative_drawdown(portfolio_returns=portfolio_returns, spy=spy, drawdown=drawdown, max_drawdown=max_drawdown, model='')
-
-if __name__ == '__main__':
-    args=''
-    portfolio_construction(args)
+    draw_cumulative_drawdown(portfolio_returns=portfolio_returns, spy=spy, drawdown=drawdown, max_drawdown=max_drawdown, model=model)

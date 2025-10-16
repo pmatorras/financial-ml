@@ -5,14 +5,17 @@ FIGURE_DIR = ROOT_DIR / "figures"
 TEST_DIR = ROOT_DIR / "test"
 DEBUG_DIR = ROOT_DIR /"debug"
 LOGS_DIR = ROOT_DIR / "logs"
-SP500_NAMES_FILE = DATA_DIR/"sp500_list.csv"
-SP500_MARKET_FILE = DATA_DIR/"sp500_market.csv"
-SP500_MARKET_TEST = DATA_DIR/"sp500_market_test.csv"
-SP500_MARKET_DEBUG = DEBUG_DIR/"sp500_market_debug.csv"
-SP500_FUNDA_FILE = DATA_DIR/"sp500_fundamentals.csv"
-SP500_FUNDA_TEST = DATA_DIR/"sp500_fundamentals_test.csv"
-SP500_FUNDA_DEBUG = DEBUG_DIR/"sp500_fundamentals_debug.csv"
-PRED_FILE = DATA_DIR/"oof_predictions.csv"
+SP500_NAMES_FILE = DATA_DIR / "sp500_list.csv"
+SP500_MARKET_FILE = DATA_DIR / "sp500_market.csv"
+SP500_MARKET_TEST = DATA_DIR / "sp500_market_test.csv"
+SP500_MARKET_DEBUG = DEBUG_DIR / "sp500_market_debug.csv"
+SP500_FUNDA_FILE = DATA_DIR / "sp500_fundamentals.csv"
+SP500_FUNDA_TEST = DATA_DIR / "sp500_fundamentals_test.csv"
+SP500_FUNDA_DEBUG = DEBUG_DIR / "sp500_fundamentals_debug.csv"
+SP500_PRED_FILE = DATA_DIR / "sp500_oof_predictions.csv"
+SP500_PRED_TEST = DATA_DIR / "sp500_oof_predictions_test.csv"
+SP500_PRED_DEBUG = DATA_DIR / "sp500_oof_predictions_debug.csv"
+
 DATA_INTERVAL="1mo"
 START_STORE_DATE="1995-01-01"
 SP500_LIST_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -79,5 +82,13 @@ def get_fundamental_file(args):
     if args.debug: csv_filenm =SP500_FUNDA_DEBUG
     elif args.test: csv_filenm = SP500_FUNDA_TEST
     else: csv_filenm = SP500_FUNDA_FILE
+    print("opening", csv_filenm)
+    return csv_filenm
+
+def get_prediction_file(args):
+    print(args)
+    if args.debug: csv_filenm =SP500_PRED_DEBUG
+    elif args.test: csv_filenm = SP500_PRED_TEST
+    else: csv_filenm = SP500_PRED_FILE
     print("opening", csv_filenm)
     return csv_filenm

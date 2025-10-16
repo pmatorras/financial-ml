@@ -25,11 +25,27 @@ def plot_rf_feature_importance(model, feature_names, save_path="figures/feature_
     
     return importance_df
 
-def plot_logistic_coefficients(model, feature_names, save_path="figures/feature_importance_logistic.png"):
+def plot_logistic_coefficients(pipeline, feature_names, save_path="figures/feature_importance_logistic.png"):
     """Plot coefficients from logistic regression"""
     
-    coef = model.coef_[0]
+    # Extract the scaler and classifier from pipeline
+    if hasattr(pipeline, 'named_steps'):
+        scaler = pipeline.named_steps.get('scale', None)
+        clf = pipeline.named_steps.get('clf', None)
+    else:
+        # If not a pipeline, assume no scaling
+        scaler = None
+        clf = pipeline
     
+    # Get coefficients
+    coef_scaled = clf.coef_[0]
+    
+    # Unscale if scaler exists
+    if scaler is not None and hasattr(scaler, 'scale_'):
+        coef = coef_scaled / scaler.scale_  # Convert to original units
+    else:
+        coef = coef_scaled
+        
     coef_df = pd.DataFrame({
         'feature': feature_names,
         'coefficient': coef,
@@ -94,7 +110,7 @@ def analyze_feature_importance(models_dict, X, y, feature_names):
             print(f"Coefficients: {model_name}")
             print(f"{'='*60}")
             coef_df = plot_logistic_coefficients(
-                model, feature_names,
+                pipeline, feature_names,
                 save_path=f"figures/coefficients_{model_name.lower()}.png"
             )
             print(coef_df.sort_values('abs_coefficient', ascending=False).to_string(index=False))
