@@ -145,13 +145,90 @@ def resolve_concept2(cf_json, canonical_key, compare=False, merge=False):
     for tax, tag, unit in candidates:
         df = extract_tag_pit(cf_json, tax, tag, unit)
         if not df.empty:
+            #print("candidate not empty")#, tag, "\n---\n", df)
             found.append((tax, tag, unit, df))
-    
+
+    #print("candidates", canonical_key)
+    # ADD THIS DEBUG BLOCK
+    #print(f"DEBUG: found list has {len(found)} items for {canonical_key}")
+    #for t, g, u, d in found:
+    #    print(f"  DEBUG: - taxonomy={t}, tag={g}, unit={u}, rows={len(d)}")
     if not found:
         return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+    # Special logic for CommonStockSharesOutstanding: sum Class A + Class B
+    print("canon", canonical_key)
+    if canonical_key == "CommonStockSharesOutstanding":
+        #print("im in")
+        # Try to find class-specific shares
+        classA_df = next((d for t,g,u,d in found if "ClassA" in g), None)
+        classB_df = next((d for t,g,u,d in found if "ClassB" in g), None)
+        #print("classes", classA_df, classB_df)
+        # If both classes exist, sum them
+        if classA_df is not None and classB_df is not None:
+            merged = pd.merge(
+                classA_df,
+                classB_df,
+                on=["period_end", "filed"], 
+                how="outer",
+                suffixes=("_A", "_B")
+            )
+            # Fill NaN with 0 for outer join, then sum
+            merged["value_A"] = merged["value_A"].fillna(0)
+            merged["value_B"] = merged["value_B"].fillna(0)
+            
+            out = pd.DataFrame({
+                "period_end": merged["period_end"],
+                "filed": merged["filed"],
+                "value": merged["value_A"] + merged["value_B"],
+                "metric": "CommonStockSharesOutstanding",
+                "unit": "shares",
+                "source_taxonomy": "us-gaap",
+                "source_tag": "CommonStockSharesOutstanding (Class A + B)",
+                "canonical_key": canonical_key
+            })
+            return out
+        
+        # Otherwise use standard total if available
+        priority_tags = [
+            "CommonStockSharesOutstanding",      # Primary
+            "CommonStockSharesIssued",           # Fallback 1
+            "EntityCommonStockSharesOutstanding" # Fallback 2 (dei)
+        ]
+        
+        # Collect dataframes for each priority tag
+        tag_dfs = {}
+        for priority_tag in priority_tags:
+            match = next((df for t, g, u, df in found if g == priority_tag), None)
+            if match is not None:
+                tag_dfs[priority_tag] = match.copy()
+        
+        # Start with highest priority tag
+        if "CommonStockSharesOutstanding" in tag_dfs:
+            out = tag_dfs["CommonStockSharesOutstanding"].copy()
+        elif "CommonStockSharesIssued" in tag_dfs:
+            out = tag_dfs["CommonStockSharesIssued"].copy()
+        elif "EntityCommonStockSharesOutstanding" in tag_dfs:
+            out = tag_dfs["EntityCommonStockSharesOutstanding"].copy()
+        else:
+            return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+        
+        # Fill gaps with lower priority tags
+        for priority_tag in priority_tags[1:]:  # Skip the first one we already used
+            if priority_tag in tag_dfs:
+                fallback = tag_dfs[priority_tag]
+                # Find dates in fallback that don't exist in out
+                existing_dates = set(out['period_end'])
+                new_data = fallback[~fallback['period_end'].isin(existing_dates)]
+                if not new_data.empty:
+                    out = pd.concat([out, new_data], ignore_index=True)
+                    
+        out['canonical_key'] = canonical_key
+        return out.sort_values('period_end').reset_index(drop=True)
     
+ 
     # Special logic for Liabilities: compute from components if total missing
     if canonical_key == "Liabilities":
+        print("im in liabilities")
         total_df = next((d for t,g,u,d in found if g=="Liabilities"), None)
         current_df = next((d for t,g,u,d in found if g=="LiabilitiesCurrent"), None)
         noncurrent_df = next((d for t,g,u,d in found if g=="LiabilitiesNoncurrent"), None)
@@ -175,7 +252,43 @@ def resolve_concept2(cf_json, canonical_key, compare=False, merge=False):
                 "canonical_key": canonical_key
             })
             return out
+        assets_candidates = CANONICAL_CONCEPTS.get("Assets", [])
+        equity_candidates = CANONICAL_CONCEPTS.get("StockholdersEquity", [])
         
+        assets_df = None
+        for tax, tag, unit in assets_candidates:
+            df = extract_tag_pit(cf_json, tax, tag, unit)
+            if not df.empty:
+                assets_df = df
+                break
+        
+        equity_df = None
+        for tax, tag, unit in equity_candidates:
+            df = extract_tag_pit(cf_json, tax, tag, unit)
+            if not df.empty:
+                equity_df = df
+                break
+        
+        if assets_df is not None and equity_df is not None:
+            merged = pd.merge(
+                assets_df, equity_df,
+                on=["period_end", "filed"],
+                how="inner",
+                suffixes=("_assets", "_equity")
+            )
+            
+            if len(merged) > 0:
+                out = pd.DataFrame({
+                    "period_end": merged["period_end"],
+                    "filed": merged["filed"],
+                    "value": merged["value_assets"] - merged["value_equity"],
+                    "metric": "Liabilities",
+                    "unit": "USD",
+                    "source_taxonomy": "us-gaap",
+                    "source_tag": "Liabilities (computed from Assets-Equity)",
+                    "canonical_key": canonical_key
+                })
+                return out
         if total_df is not None:
             out = total_df.copy()
         elif current_df is not None:
@@ -231,8 +344,9 @@ def fetch_facts_latest_for_cik(cik, ticker, dict_facts):
     # Resolve each canonical key once
     series = []
     for canon_key in requested_keys:
-        needs_merge = canon_key in ["Revenues", "SharesOutstanding", "NetIncomeLoss"]
-        needs_compare = canon_key == "SharesOutstanding"
+        needs_merge = canon_key in ["Revenues", "CommonStockSharesOutstanding", "NetIncomeLoss"]
+        needs_compare = canon_key == "CommonStockSharesOutstanding"
+        print("pre concept", canon_key)
         df_k = resolve_concept2(cf, canon_key, compare=needs_compare, merge=needs_merge)
 
         #df_k = resolve_concept(cf, canon_key, compare=(canon_key == "SharesOutstanding"))

@@ -19,8 +19,8 @@ SP500_LIST_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 MARKET_KEYS = ["ClosePrice", "r1", "r12", "mom121","vol3","vol12"]
 FUNDA_KEYS  = ["BookToMarket","ROE", "ROA", "NetMargin", "Leverage",  'AssetGrowth',  'NetShareIssuance','LogMktCap']
 
-DEBUG_SYMBOLS = ['DTE', 'AEP']
-
+DEBUG_SYMBOLS = ['MRK']# 'CSX'] #['DTE', 'AEP']
+'''
 FUNDAMENTAL_VARS = [
     ("us-gaap","Assets","USD"),
     ("us-gaap","Liabilities","USD"),
@@ -28,12 +28,19 @@ FUNDAMENTAL_VARS = [
     ("us-gaap","Revenues","USD"),
     ("us-gaap","NetIncomeLoss","USD"),
 #    ("us-gaap","EarningsPerShareDiluted","USD/share"),
-    ("us-gaap","CommonStockSharesOutstanding","shares"), #Careful with double counting this (see https://www.perplexity.ai/search/i-am-developing-a-framework-th-6QC.Sc1JS1GjJQBfELScNw#5)
+    ("us-gaap","CommonStockSharesOutstanding","shares")
 ]
+'''
 CANONICAL_CONCEPTS = {
     "CommonStockSharesOutstanding": [
         ("us-gaap", "CommonStockSharesOutstanding", "shares"),
+        ("us-gaap", "CommonStockSharesIssued", "shares"),
         ("dei", "EntityCommonStockSharesOutstanding", "shares"),
+        # Add class AB-specific tags
+        ("us-gaap", "CommonClassAMember", "shares"),
+        ("us-gaap", "CommonClassBMember", "shares"),
+        ("us-gaap", "CommonStockClassASharesOutstanding", "shares"),
+        ("us-gaap", "CommonStockClassBSharesOutstanding", "shares"),
     ],
     "Assets": [("us-gaap", "Assets", "USD")],
     "Liabilities": [
@@ -41,10 +48,13 @@ CANONICAL_CONCEPTS = {
         ("us-gaap", "LiabilitiesCurrent", "USD"),  # Current liabilities only
         ("us-gaap", "LiabilitiesNoncurrent", "USD"),  # Non-current only
     ],
-    "StockholdersEquity": [("us-gaap", "StockholdersEquity", "USD")],
+    "StockholdersEquity": [("us-gaap", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest", "USD"),
+                           ("us-gaap", "StockholdersEquity", "USD")
+                           ],
     "Revenues": [("us-gaap", "Revenues", "USD"),
+                 ("us-gaap", "SalesRevenueNet", "USD"),  
                  ("us-gaap", "RegulatedOperatingRevenue", "USD"),
-                 #("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
+                 ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
                  ("us-gaap","RevenueFromContractWithCustomerIncludingAssessedTax","USD")],
     "NetIncomeLoss": [
         ("us-gaap", "NetIncomeLossAvailableToCommonStockholdersBasic", "USD"),
