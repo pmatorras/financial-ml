@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from financial_ml.utils.paths import get_market_file, get_prediction_file
 from financial_ml.utils.config import FIGURE_DIR
 from financial_ml.models.definitions import get_models, get_model_name
-from financial_ml.portfolio_diagnostics import *
+from financial_ml.portfolio.diagnostics import *
 
 def construct_portfolio(df, per_top=10, per_bot=10, pred_col='y_prob'):
     """

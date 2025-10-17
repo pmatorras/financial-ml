@@ -1,9 +1,9 @@
 import argparse
 from financial_ml.data.collectors.market_data import collect_market_data
-from financial_ml.train import train
+from financial_ml.models.training import train
 from financial_ml.data.collectors.fundamental_data import fundamentals
 from financial_ml.utils.paths import createFolders
-from financial_ml.portfolio_construction import portfolio_construction
+from financial_ml.portfolio.construction import portfolio_construction
 def cli():
     parser = argparse.ArgumentParser(prog="financial_ml",
                                      description="S&P 500 data pipeline: fetch, fundamentals, train")

@@ -1,8 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-
-def plot_rf_feature_importance(model, feature_names, save_path="figures/feature_importance_rf.png"):
+from financial_ml.utils.config import FIGURE_DIR
+def plot_rf_feature_importance(model, feature_names, save_path=FIGURE_DIR / "feature_importance_rf.png"):
     """Plot feature importance from trained Random Forest"""
     
     importances = model.feature_importances_
@@ -21,11 +21,12 @@ def plot_rf_feature_importance(model, feature_names, save_path="figures/feature_
     ax.set_ylabel('Features', fontsize=12)
     ax.set_title('Random Forest Feature Importance', fontsize=14, fontweight='bold')
     plt.tight_layout()
+    print("path", save_path, FIGURE_DIR)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return importance_df
 
-def plot_logistic_coefficients(pipeline, feature_names, save_path="figures/feature_importance_logistic.png"):
+def plot_logistic_coefficients(pipeline, feature_names, save_path=FIGURE_DIR / "feature_importance_logistic.png"):
     """Plot coefficients from logistic regression"""
     
     # Extract the scaler and classifier from pipeline
@@ -100,7 +101,7 @@ def analyze_feature_importance(models_dict, X, y, feature_names):
             print(f"{'='*60}")
             importance_df = plot_rf_feature_importance(
                 model, feature_names, 
-                save_path=f"figures/importance_{model_name.lower()}.png"
+                save_path=FIGURE_DIR/ f"importance_{model_name.lower()}.png"
             )
             print(importance_df.sort_values('importance', ascending=False).to_string(index=False))
             
@@ -111,7 +112,7 @@ def analyze_feature_importance(models_dict, X, y, feature_names):
             print(f"{'='*60}")
             coef_df = plot_logistic_coefficients(
                 pipeline, feature_names,
-                save_path=f"figures/coefficients_{model_name.lower()}.png"
+                save_path=FIGURE_DIR /f"coefficients_{model_name.lower()}.png"
             )
             print(coef_df.sort_values('abs_coefficient', ascending=False).to_string(index=False))
         else:
