@@ -1,7 +1,7 @@
 from pathlib import Path
 
 #Directory paths
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = Path(__file__).resolve().parents[3]
 DATA_DIR = ROOT_DIR /"data"
 FIGURE_DIR = ROOT_DIR / "figures"
 TEST_DIR = ROOT_DIR / "test"

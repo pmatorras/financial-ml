@@ -1,7 +1,7 @@
 import argparse
-from financial_ml.markets import store_info
+from financial_ml.data.collectors.market_data import collect_market_data
 from financial_ml.train import train
-from financial_ml.fundamentals import fundamentals
+from financial_ml.data.collectors.fundamental_data import fundamentals
 from financial_ml.utils.paths import createFolders
 from financial_ml.portfolio_construction import portfolio_construction
 def cli():
@@ -43,7 +43,7 @@ def main(argv=None):
 
     if args.cmd == "market":
         print("Downloading market data...")
-        store_info(args)
+        collect_market_data(args)
     elif args.cmd == "fundamentals":
         print("Downloading fundamentals")
         fundamentals(args)

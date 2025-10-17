@@ -16,11 +16,15 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
-# log data and fig directories
-logs/
-data/
-figures/
-debug/
+# ============================================================
+# Data files (CSV) - ignore root-level data/ folder
+# ============================================================
+/logs/
+/data/
+/figures/
+/debug/
+!/src/financial_ml/data/
 
 # Jupyter
 .ipynb_checkpoints/
+

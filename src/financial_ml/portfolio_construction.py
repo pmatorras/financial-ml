@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from financial_ml.utils.paths import get_market_file, get_prediction_file
 from financial_ml.utils.config import FIGURE_DIR
-from financial_ml.models import get_models
+from financial_ml.models.definitions import get_models, get_model_name
 from financial_ml.portfolio_diagnostics import *
 
 def construct_portfolio(df, per_top=10, per_bot=10, pred_col='y_prob'):
@@ -62,7 +62,7 @@ def smooth_predictions(df, window=3):
     return df
 
 
-def calc_portfolio_return(group, type='100long'):
+def aggregate_portfolio_return(group, type='100long'):
     '''
     Calculate portfolio average return.
     Args:
@@ -94,14 +94,16 @@ def calc_portfolio_return(group, type='100long'):
 def draw_cumulative_drawdown(portfolio_returns,spy, drawdown, max_drawdown, model):
     # Visualizations
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+    model_name = get_model_name(model_key=model)
+    model_name_short = get_model_name(model_key=model, short_name=True)
 
     # Chart 1: Cumulative Returns
     axes[0].plot(portfolio_returns['date'], portfolio_returns['cum_return'], 
-                label='ML Strategy', linewidth=2, color='blue')
+                label=f'ML Strategy ({model_name_short})', linewidth=2, color='blue')
     if spy is not None:
         axes[0].plot(portfolio_returns['date'], portfolio_returns['spy_cum_return'], 
                     label='SPY (Buy & Hold)', linewidth=2, color='gray', linestyle='--')
-    axes[0].set_title('Cumulative Returns: ML Strategy vs SPY', fontsize=14, fontweight='bold')
+    axes[0].set_title(f'Cumulative Returns: ML Strategy ({model_name}) vs SPY', fontsize=14, fontweight='bold')
     axes[0].set_ylabel('Cumulative Return (1 = start)', fontsize=12)
     axes[0].legend(fontsize=11)
     axes[0].grid(alpha=0.3)
@@ -206,7 +208,7 @@ def portfolio_construction(args):
     analyze_sector_concentration(df, pred_col) 
 
     # Calculate Portfolio Returns
-    portfolio_returns = df.groupby('date').apply(calc_portfolio_return, include_groups=False).reset_index()
+    portfolio_returns = df.groupby('date').apply(aggregate_portfolio_return, include_groups=False).reset_index()
     portfolio_returns.columns = ['date', 'portfolio_return']
 
     # Cumulative returns

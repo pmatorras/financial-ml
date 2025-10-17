@@ -6,17 +6,9 @@ import pandas as pd
 import warnings
 from financial_ml.utils.config import SP500_NAMES_FILE, START_STORE_DATE, DATA_INTERVAL,SP500_LIST_URL, DEBUG_SYMBOLS 
 from financial_ml.utils.paths import get_market_file
-
+from financial_ml.data.collectors.utils import test_subset
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}
-def test_subset(df, args):
-    if args.debug:
-        print(f"returning the following symbols :{DEBUG_SYMBOLS}")
-        return(df[df['Symbol'].isin(DEBUG_SYMBOLS)])
-    elif args.test: 
-        print("returning only test subset")
-        return df.sort_values('Date added').head(50)
-    else:
-        return df
+
 def fetch_sp500_list(filepath, args, url=SP500_LIST_URL, headers=headers):
     '''Download SP500 list of companies'''
     if args.newtable or os.path.getsize(filepath)<1:
@@ -71,7 +63,10 @@ def add_SPY(tickers):
     else:
         tickers.append("SPY")
     return tickers
-def store_info(args):
+def collect_market_data(args):
+    '''
+    Main function to collect SP500 market data.
+    '''
     spx = fetch_sp500_list(SP500_NAMES_FILE, args, SP500_LIST_URL, headers)
     tickers = spx["Symbol"].str.replace(".", "-", regex=False).tolist()  
     sp500_marketfile = get_market_file(args)
