@@ -7,7 +7,7 @@ from financial_ml.utils.config import DEBUG_DIR,FUNDA_KEYS, MARKET_KEYS, CANONIC
 from financial_ml.utils.paths import get_prediction_file
 from financial_ml.utils.helpers import safe_div
 from financial_ml.models.definitions import get_models, get_model_name
-from financial_ml.data.loaders import get_market_file, get_fundamental_file
+from financial_ml.data.loaders import load_market, load_fundamentals
 from pandas.tseries.offsets import BQuarterEnd
 
 
