@@ -1,15 +1,14 @@
 import pandas as pd
 import numpy as np
+import joblib
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from financial_ml.utils.config import DEBUG_DIR,FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
-from financial_ml.utils.paths import get_prediction_file
-from financial_ml.utils.helpers import safe_div
+from financial_ml.utils.config import DEBUG_DIR, FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
+from financial_ml.utils.paths import get_prediction_file, get_model_file, get_features_file
 from financial_ml.models.definitions import get_models, get_model_name
 from financial_ml.data.validation import require_non_empty
 from financial_ml.data.features import to_monthly_ffill, widen_by_canonical, calculate_market_features, compute_fundamental_ratios, create_binary_labels
 from financial_ml.data.loaders import load_market, load_fundamentals
-from financial_ml.evaluation.feature_analysis import analyze_feature_importance
 
 
 
@@ -182,11 +181,20 @@ def train(args):
     predpath = get_prediction_file(args)
     pred_df.to_csv(predpath, index=False)
 
+
+    # Save trained models
+    
+    for model_name, model_pipeline in trained_models.items():
+        models_path = get_model_file(args, model_name)
+        joblib.dump(model_pipeline, models_path)
+        print(f"Saved {model_name} to {models_path}")
+    feature_path = get_features_file(args)
+    with open(feature_path, 'w') as f:
+        f.write('\n'.join(input_keys))
+    '''
     analyze_feature_importance(
         models_dict=trained_models, # Dict with model names as keys, trained pipelines as values
-        X=X,                       # numpy array shape (n_samples, n_features)
-        y=Y,                       # numpy array shape (n_samples,)
         feature_names=input_keys   # List like ['ClosePrice', 'r1', 'r12', 'mom121', ...]
     )
-
+    '''
     

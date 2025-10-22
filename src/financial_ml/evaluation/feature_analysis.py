@@ -1,9 +1,25 @@
+"""
+Feature importance analysis for trained models.
+Extracts and visualizes coefficients and feature importances.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from financial_ml.utils.config import FIGURE_DIR
+
+
 def plot_rf_feature_importance(model, feature_names, save_path=FIGURE_DIR / "feature_importance_rf.png"):
-    """Plot feature importance from trained Random Forest"""
+    """
+    Plot feature importance from trained Random Forest
+    Args:
+        model: Trained RandomForest model
+        feature_names: List of feature names
+        save_path: Path to save figure (optional)
+        
+    Returns:
+        DataFrame with feature importances
+    """
     
     importances = model.feature_importances_
     std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
@@ -21,13 +37,24 @@ def plot_rf_feature_importance(model, feature_names, save_path=FIGURE_DIR / "fea
     ax.set_ylabel('Features', fontsize=12)
     ax.set_title('Random Forest Feature Importance', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    print("path", save_path, FIGURE_DIR)
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    if save_path:
+        print("Saving file to:", save_path, FIGURE_DIR)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return importance_df
 
 def plot_logistic_coefficients(pipeline, feature_names, save_path=FIGURE_DIR / "feature_importance_logistic.png"):
-    """Plot coefficients from logistic regression"""
+    """
+    Plot coefficients from logistic regression
+    Args:
+        pipeline: Trained sklearn Pipeline with StandardScaler + LogisticRegression
+        feature_names: List of feature names
+        save_path: Path to save figure (optional)
+        
+    Returns:
+        DataFrame with coefficients
+    """
     
     # Extract the scaler and classifier from pipeline
     if hasattr(pipeline, 'named_steps'):
@@ -62,24 +89,22 @@ def plot_logistic_coefficients(pipeline, feature_names, save_path=FIGURE_DIR / "
     ax.set_title('Logistic Regression Coefficients\n(Green = Predicts Outperformance, Red = Predicts Underperformance)', 
                  fontsize=12, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    if save_path:
+        print(f"Saving figure to: {save_path}")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return coef_df
 
-def analyze_feature_importance(models_dict, X, y, feature_names):
+def analyze_feature_importance(models_dict, feature_names):
     """
     Analyze feature importance across all trained models
     
     Parameters:
     - models_dict: dict with keys like 'RandomForest', 'LogisticL2'
-    - X: feature matrix (numpy array)
-    - y: target labels (numpy array)
     - feature_names: list of feature names
     """
-    
     for model_name, pipeline in models_dict.items():
         
-        # CRITICAL FIX: Extract the actual estimator from the pipeline
         # Pipelines have steps, access the final step (the classifier)
         if hasattr(pipeline, 'named_steps'):
             # Get the last step name (usually 'model' or 'classifier')

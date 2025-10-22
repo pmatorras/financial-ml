@@ -41,9 +41,15 @@ def get_model_name (model_key, short_name=False):
     key = "short_name" if short_name else "name"
     return MODEL_METADATA.get(model_key, {}).get(key, model_key)
 
+# Define function at module level (not inside another function)
+def _sanitize_infinities(X):
+    """Replace ±inf with NaN for sklearn imputation."""
+    return np.where(np.isfinite(X), X, np.nan)
+
+
 def build_sanitize():
-    ''''Create a transformer to replace the +- inf with NaN'''
-    return FunctionTransformer(lambda X: np.where(np.isfinite(X), X, np.nan), validate=False)
+    """Create transformer to replace infinite values with NaN."""
+    return FunctionTransformer(_sanitize_infinities, validate=False)
 
 def get_models():
     sanitize = build_sanitize()
