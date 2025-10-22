@@ -26,7 +26,7 @@ def train(args):
     funda_keys = []
     df_keys = market_keys.copy()          # safe copy for concat keys
 
-    if args.use_fundamentals:
+    if not args.only_market:
         funda_keys = FUNDA_KEYS
         fundamentals = load_fundamentals(args)
         if args.debug: fundamentals.to_csv(DEBUG_DIR/"funda.csv")
@@ -64,7 +64,7 @@ def train(args):
     require_non_empty(feat_long, "feat_long")
     if args.debug: print(feat_long.keys(), feat_long)
 
-    if args.use_fundamentals:
+    if not args.only_market:
         compute_fundamental_ratios(feat_long, args)
     #Add the Y to the datafrane
     y_long = y.stack().rename("y")
@@ -112,7 +112,7 @@ def train(args):
 
     df = df.dropna(subset=input_keys)
     print(f"\nafter second dropna: {len(df)} rows")
-    if args.use_fundamentals:
+    if not args.only_market:
         if 'ticker' in df.columns:
             print(f"  Unique tickers: {df['ticker'].nunique()}")
             print(f"  Sample tickers: {sorted(df['ticker'].unique())[:20]}")

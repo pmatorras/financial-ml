@@ -40,17 +40,19 @@ def get_prediction_file(args):
 def get_model_file(args, model_name):
     '''Define path to model file based on the run mode'''
     file_dir = DEBUG_DIR if args.debug else MODELS_DIR
-    if args.debug: file_name = f'{model_name}_debug.pkl'
-    elif args.test: file_name = f'{model_name}_test.pkl'
-    else: file_name = f'{model_name}.pkl'
+    market_suffix = '_only_market' if args.only_market else ''
+    if args.debug: file_name = f'{model_name}{market_suffix}_debug.pkl'
+    elif args.test: file_name = f'{model_name}{market_suffix}_test.pkl'
+    else: file_name = f'{model_name}{market_suffix}.pkl'
     print("Chosen model file:", file_dir / file_name)
     return file_dir / file_name
 
 def get_features_file(args):
     '''Define path to file with features based on the run mode'''
     file_dir = DEBUG_DIR if args.debug else MODELS_DIR
-    if args.debug: file_name = f'feature_names_debug.txt'
-    elif args.test: file_name = f'feature_names_test.txt'
-    else: file_name = f'feature_names.txt'
-    print("Chosen model file:", file_dir / file_name)
+    market_suffix = '_only_market' if args.only_market else ''
+    if args.debug: file_name = f'feature_names{market_suffix}_debug.txt'
+    elif args.test: file_name = f'feature_names{market_suffix}_test.txt'
+    else: file_name = f'feature_names{market_suffix}.txt'
+    print("Chosen feature file:", file_dir / file_name)
     return file_dir / file_name

@@ -4,11 +4,9 @@ Load trained models and run feature importance analysis.
 """
 
 import joblib
-from pathlib import Path
 from financial_ml.evaluation.feature_analysis import analyze_feature_importance
 from financial_ml.models.definitions import get_models
-from financial_ml.utils.paths import get_model_file
-from financial_ml.utils.config import MODELS_DIR
+from financial_ml.utils.paths import get_model_file, get_features_file
 
 def analyze_models(args):
     """
@@ -39,7 +37,7 @@ def analyze_models(args):
         return 1
     
     # Load feature names
-    feature_path = MODELS_DIR / "feature_names.txt"
+    feature_path = get_features_file(args)
     if feature_path.exists():
         with open(feature_path, 'r') as f:
             input_keys = [line.strip() for line in f]

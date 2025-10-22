@@ -20,8 +20,6 @@ def cli():
     p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
 
     p_train = sub.add_parser("train", help="Train models")
-    p_train.add_argument("--use-fundamentals", action="store_true",
-                         help="Include fundamentals in training features")
     
     p_anal = sub.add_parser("analyze", help="Analize models")
 
@@ -32,7 +30,8 @@ def cli():
     for sp in (p_info, p_funda, p_anal, p_train, p_portfolio):
         sp.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
-
+        sp.add_argument("--only-market", dest="only_market",
+                         help="Explicitly don't include fundamentals in training features", action="store_true")
 
     return parser
 
