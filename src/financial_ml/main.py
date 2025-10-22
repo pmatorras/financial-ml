@@ -1,7 +1,6 @@
 import argparse
-from financial_ml.data.collectors.market_data import collect_market_data
-from financial_ml.models.training import train
-from financial_ml.data.collectors.fundamental_data import fundamentals
+from financial_ml.data.collectors import collect_market_data, collect_fundamentals
+from financial_ml.models import train
 from financial_ml.utils.paths import createFolders
 from financial_ml.portfolio import run_backtest
 from financial_ml.evaluation.analyze import analyze_models
@@ -48,7 +47,7 @@ def main(argv=None):
         collect_market_data(args)
     elif args.cmd == "fundamentals":
         print("Downloading fundamentals")
-        fundamentals(args)
+        collect_fundamentals(args)
     elif args.cmd == "train":
         print("Performing training")
         train(args)

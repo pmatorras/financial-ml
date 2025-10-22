@@ -8,7 +8,7 @@ import numpy as np
 from pandas.tseries.offsets import BQuarterEnd
 
 from financial_ml.utils.helpers import safe_div
-from financial_ml.utils.config import MARKET_KEYS, FUNDA_KEYS, CANONICAL_CONCEPTS, DEBUG_DIR
+from financial_ml.utils.config import DEBUG_DIR
 from financial_ml.data.validation import require_non_empty
 
 

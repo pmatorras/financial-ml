@@ -4,7 +4,7 @@ Portfolio visualization functions.
 
 import matplotlib.pyplot as plt
 from financial_ml.utils.config import FIGURE_DIR
-from financial_ml.models.definitions import get_model_name
+from financial_ml.models import get_model_name
 
 def draw_cumulative_drawdown(portfolio_returns,spy, drawdown, max_drawdown, model):
     """

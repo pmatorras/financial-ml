@@ -2,7 +2,7 @@
 Utility functions comon for the data collectors
 '''
 from financial_ml.utils.config import DEBUG_SYMBOLS
-def test_subset(df, args):
+def filter_market_subset(df, args):
     '''
     Filter SP500 based on the run mode (debug,test or production).
     Returns a skimmed df

@@ -4,10 +4,8 @@ Portfolio backtesting orchestration.
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from financial_ml.utils.paths import get_market_file, get_prediction_file
-from financial_ml.utils.config import FIGURE_DIR
-from financial_ml.models.definitions import get_models, get_model_name
+from financial_ml.models import get_models
 from financial_ml.portfolio.diagnostics import print_model_agreement, compare_model_performance_by_period, analyze_prediction_stability, analyze_turnover, analyze_sector_concentration, analyze_beta_exposure, compare_drawdowns_to_spy, test_sharpe_significance
 from financial_ml.portfolio.performance import aggregate_portfolio_return, include_benchmark_return
 from financial_ml.portfolio.visualization import draw_cumulative_drawdown

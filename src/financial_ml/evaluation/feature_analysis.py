@@ -2,10 +2,9 @@
 Feature importance analysis for trained models.
 Extracts and visualizes coefficients and feature importances.
 """
-
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 from financial_ml.utils.config import FIGURE_DIR
 
 

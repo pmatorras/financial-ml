@@ -5,7 +5,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from financial_ml.utils.config import SP500_NAMES_FILE, CANONICAL_CONCEPTS
 from financial_ml.utils.paths import get_fundamental_file
-from financial_ml.data.collectors.utils import test_subset
+from financial_ml.data.collectors.utils import filter_market_subset
 
 # SEC guidance: include a descriptive User-Agent with contact email and keep request rate modest
 UA = "ResearchBot/1.0 (contact@example.com)"  
@@ -364,37 +364,6 @@ def resolve_concept2(cf_json, canonical_key, args, compare=False, merge=False):
                 return result
             
             return pd.DataFrame(columns=["period_end","filed","value","metric","unit","canonical_key"])
-
-
-    '''Old logic
-    # Special logic for Liabilities: compute from components if total missing
-    if canonical_key == "Liabilities":
-        print("im in liabilities")
-        total_df = next((d for t,g,u,d in found if g=="Liabilities"), None)
-        current_df = next((d for t,g,u,d in found if g=="LiabilitiesCurrent"), None)
-        noncurrent_df = next((d for t,g,u,d in found if g=="LiabilitiesNoncurrent"), None)
-        
-        if total_df is None and current_df is not None and noncurrent_df is not None:
-            merged = pd.merge(
-                current_df,
-                noncurrent_df,
-                on=["period_end", "filed"], how="inner",
-                suffixes=("_curr", "_noncurr")
-            )
-            
-            out = pd.DataFrame({
-                "period_end": merged["period_end"],
-                "filed": merged["filed"],
-                "value": merged["value_curr"] + merged["value_noncurr"],
-                "metric": "Liabilities",
-                "unit": "USD",
-                "source_taxonomy": "us-gaap",
-                "source_tag": "Liabilities (computed)",
-                "canonical_key": canonical_key
-            })
-            return out
-        return pd.DataFrame(columns=["period_end","filed","value","metric","unit","canonical_key"])
-        '''
     
     # Merge logic for concepts with multiple tags covering different periods
     if merge and len(found) > 1:
@@ -463,10 +432,10 @@ def fetch_facts_latest_for_cik(cik, ticker, dict_facts,args):
     return facts_latest
 
 
-def fundamentals(args):
+def collect_fundamentals(args):
     '''Retrieve sp500 information from markets.py, and obtain the fundamentals for these'''
     df_all = pd.read_csv(SP500_NAMES_FILE)
-    df=test_subset(df_all,args)
+    df=filter_market_subset(df_all,args)
     pairs = list(
         df.loc[:, ["CIK", "Symbol"]]
         .assign(CIK=lambda x: x["CIK"].astype(str).str.zfill(10))

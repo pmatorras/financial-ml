@@ -4,9 +4,9 @@ Load trained models and run feature importance analysis.
 """
 
 import joblib
-from financial_ml.evaluation.feature_analysis import analyze_feature_importance
-from financial_ml.models.definitions import get_models
+from financial_ml.models import get_models
 from financial_ml.utils.paths import get_model_file, get_features_file
+from financial_ml.evaluation.feature_analysis import analyze_feature_importance
 
 def analyze_models(args):
     """
