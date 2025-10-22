@@ -1,12 +1,13 @@
 from pathlib import Path
 
 #Directory paths
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = Path(__file__).resolve().parents[3]
 DATA_DIR = ROOT_DIR /"data"
 FIGURE_DIR = ROOT_DIR / "figures"
 TEST_DIR = ROOT_DIR / "test"
 DEBUG_DIR = ROOT_DIR /"debug"
 LOGS_DIR = ROOT_DIR / "logs"
+MODELS_DIR = ROOT_DIR / "models"
 
 
 #SP500 company info list
@@ -25,7 +26,8 @@ SP500_FUNDA_DEBUG = DEBUG_DIR / "sp500_fundamentals_debug.csv"
 #Prediction files
 SP500_PRED_FILE = DATA_DIR / "sp500_oof_predictions.csv"
 SP500_PRED_TEST = DATA_DIR / "sp500_oof_predictions_test.csv"
-SP500_PRED_DEBUG = DATA_DIR / "sp500_oof_predictions_debug.csv"
+SP500_PRED_DEBUG = DEBUG_DIR / "sp500_oof_predictions_debug.csv"
+
 
 DATA_INTERVAL="1mo"
 START_STORE_DATE="1995-01-01"

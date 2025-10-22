@@ -5,8 +5,51 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
+MODEL_METADATA = {
+    "logreg_l1": {
+        "name": "Logistic Regression (L1)",
+        "short_name": "L1 Logreg",
+        "description": "L1-regularized logistic regression with feature selection",
+        "color": "#1f77b4",  # For future implemmentation
+        "marker": "o"
+    },
+    "logreg_l2": {
+        "name": "Logistic Regression (L2)",
+        "short_name": "L2 Logreg",
+        "description": "L2-regularized logistic regression (ridge)",
+        "color": "#ff7f0e",
+        "marker": "s"
+    },
+    "rf": {
+        "name": "Random Forest",
+        "short_name": "RF",
+        "description": "Random forest classifier with balanced class weights",
+        "color": "#2ca02c",
+        "marker": "^"
+    }
+}
+
+def get_model_name (model_key, short_name=False):
+    """
+    Get the display name for a model
+    Args:
+        model_key: Model identifier (has to be one of MODEL_METADATA keys)
+        short_name: Display the short name or not 
+    Returns:
+        Display name/short name for the model
+    """
+    key = "short_name" if short_name else "name"
+    return MODEL_METADATA.get(model_key, {}).get(key, model_key)
+
+# Define function at module level (not inside another function)
+def _sanitize_infinities(X):
+    """Replace ±inf with NaN for sklearn imputation."""
+    return np.where(np.isfinite(X), X, np.nan)
+
+
 def build_sanitize():
-    return FunctionTransformer(lambda X: np.where(np.isfinite(X), X, np.nan), validate=False)
+    """Create transformer to replace infinite values with NaN."""
+    return FunctionTransformer(_sanitize_infinities, validate=False)
 
 def get_models():
     sanitize = build_sanitize()

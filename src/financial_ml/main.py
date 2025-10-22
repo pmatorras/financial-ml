@@ -1,9 +1,9 @@
 import argparse
-from financial_ml.markets import store_info
-from financial_ml.train import train
-from financial_ml.fundamentals import fundamentals
+from financial_ml.data.collectors import collect_market_data, collect_fundamentals
+from financial_ml.models import train
 from financial_ml.utils.paths import createFolders
-from financial_ml.portfolio_construction import portfolio_construction
+from financial_ml.portfolio import run_backtest
+from financial_ml.evaluation.analyze import analyze_models
 def cli():
     parser = argparse.ArgumentParser(prog="financial_ml",
                                      description="S&P 500 data pipeline: fetch, fundamentals, train")
@@ -19,17 +19,18 @@ def cli():
     p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
 
     p_train = sub.add_parser("train", help="Train models")
-    p_train.add_argument("--use-fundamentals", action="store_true",
-                         help="Include fundamentals in training features")
     
+    p_anal = sub.add_parser("analyze", help="Analize models")
+
     p_portfolio = sub.add_parser("portfolio", help="Create portfolio")
     p_portfolio.add_argument("--model", "-m", help="chose ml to display", type=str, default='rf', choices= ["logreg_l1", "logreg_l2", "rf"])
 
     #ensure --test --debug can go anywhere
-    for sp in (p_info, p_funda, p_train, p_portfolio):
+    for sp in (p_info, p_funda, p_anal, p_train, p_portfolio):
         sp.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
-
+        sp.add_argument("--only-market", dest="only_market",
+                         help="Explicitly don't include fundamentals in training features", action="store_true")
 
     return parser
 
@@ -43,14 +44,17 @@ def main(argv=None):
 
     if args.cmd == "market":
         print("Downloading market data...")
-        store_info(args)
+        collect_market_data(args)
     elif args.cmd == "fundamentals":
         print("Downloading fundamentals")
-        fundamentals(args)
+        collect_fundamentals(args)
     elif args.cmd == "train":
         print("Performing training")
         train(args)
+    elif args.cmd == "analyze":
+        print("Analyzing models")
+        analyze_models(args)
     elif args.cmd == "portfolio":
         print("Getting portfolio")
-        portfolio_construction(args)
+        run_backtest(args)
     return 0
