@@ -23,7 +23,7 @@ def cli():
     p_anal = sub.add_parser("analyze", help="Analize models")
 
     p_portfolio = sub.add_parser("portfolio", help="Create portfolio")
-    p_portfolio.add_argument("--model", "-m", help="chose ml to display", type=str, default='rf', choices= ["logreg_l1", "logreg_l2", "rf"])
+
 
     #ensure --test --debug can go anywhere
     for sp in (p_info, p_funda, p_anal, p_train, p_portfolio):
@@ -31,6 +31,7 @@ def cli():
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
         sp.add_argument("--only-market", dest="only_market",
                          help="Explicitly don't include fundamentals in training features", action="store_true")
+        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='rf', choices= ["logreg_l1", "logreg_l2", "rf", "gb"])
 
     return parser
 

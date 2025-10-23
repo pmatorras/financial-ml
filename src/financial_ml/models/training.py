@@ -140,7 +140,9 @@ def train(args):
     models = get_models()
     trained_models = {}
     print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
-    for name, pipe in models.items():
+    models_to_run = models.items() if args.model is None else [(args.model, models[args.model])]
+
+    for name, pipe in models_to_run:
         print(f"Training {get_model_name(name)}")
         aucs_test = []
         aucs_train = []
@@ -198,10 +200,5 @@ def train(args):
     feature_path = get_features_file(args)
     with open(feature_path, 'w') as f:
         f.write('\n'.join(input_keys))
-    '''
-    analyze_feature_importance(
-        models_dict=trained_models, # Dict with model names as keys, trained pipelines as values
-        feature_names=input_keys   # List like ['ClosePrice', 'r1', 'r12', 'mom121', ...]
-    )
-    '''
+
     
