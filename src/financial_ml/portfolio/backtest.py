@@ -22,10 +22,29 @@ def run_backtest(args, per_top=10, per_bot=10):
         per_bot: Percentage of bottom stocks to short
     """
     # Load Data for predictions, stocks, and SPY benchmark
-    model = 'rf_cal' if 'all' in args.model else args.model
+    model = args.best_model if 'all' in args.model else args.model
     print("making calculations for", model)
     preds_nm = get_prediction_file(args)
     preds = pd.read_csv(preds_nm)
+
+    doEnsemble=False
+    if doEnsemble:
+        # Create ensemble predictions by averaging LogReg_L2 + RF_cal
+        logreg_preds = preds[preds['model'] == 'logreg_l2'][['date', 'ticker', 'y_prob', 'y_true']].copy()
+        rf_preds = preds[preds['model'] == 'rf_cal'][['date', 'ticker', 'y_prob', 'y_true']].copy()
+        
+        # Merge and average
+        ensemble = logreg_preds.merge(rf_preds, on=['date', 'ticker'], suffixes=('_lr', '_rf'))
+        ensemble['y_prob'] = 0.5 * ensemble['y_prob_lr'] + 0.5 * ensemble['y_prob_rf']
+        ensemble['y_true'] = ensemble['y_true_lr']  # Same labels
+        ensemble['model'] = 'ensemble_A'
+        ensemble = ensemble[['date', 'ticker', 'y_prob', 'y_true', 'model']]
+        
+        # Append ensemble to predictions
+        preds = pd.concat([preds, ensemble], ignore_index=True)
+        print(f"Added ensemble_A predictions: {len(ensemble)} rows")
+        model = "ensemble_A"
+
     preds['date'] = pd.to_datetime(preds['date'])
     prices_file = get_market_file(args)
     prices = pd.read_csv(prices_file, index_col=0, parse_dates=True).ffill()
@@ -41,7 +60,7 @@ def run_backtest(args, per_top=10, per_bot=10):
 
     models =get_models()
     print_model_agreement(df, models)
-    compare_model_performance_by_period(preds, returns_realized)
+    compare_model_performance_by_period(preds, returns_realized, models=['logreg_l2', model])
     # Filter to best model (Logistic L2)
     df = df[df['model'] == model].copy()
     df = smooth_predictions(df, window=3)

@@ -103,7 +103,6 @@ def analyze_feature_importance(models_dict, feature_names):
     - feature_names: list of feature names
     """
     for model_name, pipeline in models_dict.items():
-        
         # Pipelines have steps, access the final step (the classifier)
         if hasattr(pipeline, 'named_steps'):
             # Get the last step name (usually 'model' or 'classifier')
@@ -117,6 +116,14 @@ def analyze_feature_importance(models_dict, feature_names):
             # If it's not a pipeline, use directly
             model = pipeline
         
+        # If it's a CalibratedClassifierCV, unwrap to get the base estimator
+        if hasattr(model, 'calibrated_classifiers_'):
+            # CalibratedClassifierCV stores calibrated classifiers
+            # Get the base estimator from the first calibrated classifier
+            base_estimator = model.calibrated_classifiers_[0].estimator
+            print(f"\n{model_name}: Detected CalibratedClassifierCV, accessing base estimator")
+            model = base_estimator
+            
         # Now extract feature importance based on model type
         if hasattr(model, 'feature_importances_'):
             # Random Forest or tree-based model

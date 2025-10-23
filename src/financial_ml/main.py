@@ -38,7 +38,7 @@ def cli():
 def main(argv=None):
     parser = cli()
     args = parser.parse_args(argv)
-
+    args.best_model = 'rf_cal'
     print(f"Running the code, with arguments: {args}")
     createFolders()
 

@@ -112,7 +112,7 @@ def model_agreement_correlations(preds_df, models_dict, print_results=True):
         )
     }
 
-def compare_model_performance_by_period(preds_df, returns_df):
+def compare_model_performance_by_period(preds_df, returns_df, models):
     """Compare RF vs Logistic performance across time periods"""
     
     # Merge predictions with returns
@@ -138,7 +138,7 @@ def compare_model_performance_by_period(preds_df, returns_df):
         
         print(f"\n{period}:")
         
-        for model in ['logreg_l2', 'rf_cal']:
+        for model in models:
             model_data = period_data[period_data['model'] == model]
             
             # Calculate AUC (prediction quality)
