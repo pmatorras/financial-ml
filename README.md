@@ -1,8 +1,23 @@
 # Financial-ML
 
-This project ingests S\&P 500 constituents, downloads historical monthly close prices via a market data API, builds engineered features, and trains baseline classification models to predict whether a stock’s 12-month forward return will outperform a benchmark.
-It can also fetch fundamentals for each company from public filings and persist tidy, time-aligned datasets for downstream modeling.
+A machine learning system for equity selection that predicts which S&P 500 stocks will outperform the market benchmark. The project combines market data with company fundamentals to construct long/short portfolios, using time series cross-validation to prevent lookahead bias and comprehensive backtesting to validate performance against SPY. The goal: identify stocks with positive alpha while maintaining robust risk management through systematic validation at both model and portfolio levels
 
+
+## Pipeline Architecture
+
+The pipeline of this project follows a standard MLOps workflow: data ingestion → feature engineering → model training with time series cross-validation → portfolio construction → backtesting.
+
+```mermaid
+flowchart TD
+    A[Market Data] --> C[Feature Engineering]
+    B[Fundamentals Data] --> C
+    C --> D[Time Series CV & Training]
+    D -.-> E[Model Evaluation]
+    D --> F[Portfolio Construction]
+    F -.-> G[Portfolio Diagnostics]
+    F --> H[Performance vs SPY]
+```
+***
 ## Table of Contents
 - [Features](#features)
 - [Project structure](#project-structure)
@@ -200,48 +215,73 @@ Construct portfolios from predictions and run comprehensive backtests.
 
 Shared configuration, paths, and utility functions that can be accesible from all over the repository.
 
+***
+
 ## Installation
 
-- Requires Python ≥ 3.10; core dependencies are declared in pyproject.toml (pandas, numpy, scikit-learn, yfinance, requests, pyarrow).
-- Option A — Development (editable install): install the package from source so local changes are picked up.
-- Option B — Reproducible (pinned): install exact versions from `Requirements.txt`, then install the package.
-- It is recommended to create and activate a virtual environment and `upgrade pip/setuptools` before installing.
-- If console scripts are defined in pyproject, they will be available on PATH after installation.
+**Requirements:** Python ≥ 3.10
 
-Editable install:
+### Quick Install
 
-```
+```bash
+# Clone repository
+git clone https://github.com/pmatorras/financial-ml.git
+cd financial-ml
+
+# Create virtual environment (recommended)
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install -U pip setuptools wheel
+
+# Install package in editable mode
 pip install -e .
 ```
 
-Reproducible install with pins:
+### Reproducible Install
 
-```
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install -U pip setuptools wheel
+For exact dependency versions used in development:
+
+```bash
 pip install -r Requirements.txt
 pip install -e .
 ```
 
+**Note:** The package will be installed as `financial_ml` and can be run via `python -m financial_ml <command>`.
+
 ## Quick start
 
+### Complete ML Pipeline
+
+Run the full pipeline from data collection to backtesting:
 ```bash
-#1. Run the complete ML pipeline:
+# 1. Collect market data (downloads S&P 500 prices)
 python -m financial_ml market
+# 2. Fetch fundamentals from SEC EDGAR
 python -m financial_ml fundamentals
 
-#2. Train models
+#3. Train models
 python -m financial_ml train
 
-#3. Anayse training results
+#4. Anayse training results
 python -m financial_ml analyze
 
-#4. Create portfolio and backtests
+#5. Create portfolio and backtests
 python -m financial_ml portfolio --model rf
+```
+**Output:** Models saved to `models/`, predictions to `predictions/`, and performance plots to `figures/`.
+
+### Fast Development Mode
+
+For quick iterations using a subset of ~50 stocks:
+
+```bash
+# Download test subset
+python -m financial_ml market --test
+
+# Train on subset (market features only, faster)
+python -m financial_ml train --test --no-fundamentals
+
+# Backtest
+python -m financial_ml portfolio --model rf --test
 ```
 
 ### Global Flags
@@ -332,7 +372,7 @@ Two types of data are currently considered: market and fundamental data:
 
 This creates a **relative momentum** signal focused on identifying stocks that beat the market, suitable for long/short portfolio construction.
 
-
+***
 
 ## Modelling
 
@@ -504,7 +544,11 @@ python -m financial_ml portfolio --model logreg_l1
 ***
 
 ### Possible future extensions
- 
+
+- Extend fundamentals information to earlier dates: 
+    - Challenging since EDGAR API cannot be used
+- Add alternative data sources (e.g sentiment)
+- Extend to international markets.
 - Residual momentum: A stock’s trend after removing broad market/factor co‑movement, highlighting stock‑specific persistence rather than index‑driven moves.
 - 12‑month drawdown: The percent distance of the current price from its highest level over the past year, summarizing recent loss severity and recovery state.
 - Gross Profitability: $\frac{Sales-COGS}{Assets}$ (requires [COGS](https://en.wikipedia.org/wiki/Cost_of_goods_sold)) is a strong profitability proxy complementary to ROE/ROA in cross-sectional models.
