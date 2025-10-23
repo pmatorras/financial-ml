@@ -138,7 +138,7 @@ def compare_model_performance_by_period(preds_df, returns_df):
         
         print(f"\n{period}:")
         
-        for model in ['logreg_l2', 'rf']:
+        for model in ['logreg_l2', 'rf_cal']:
             model_data = period_data[period_data['model'] == model]
             
             # Calculate AUC (prediction quality)
@@ -309,8 +309,6 @@ def analyze_sector_concentration(df, pred_col='y_prob', latest_date=None):
     """
     if latest_date is None:
         latest_date = df['date'].max()
-    print( df[(df['date'] == latest_date)])
-
     holdings = df[(df['date'] == latest_date) & (df['position'] == 1)]['ticker'].values
     
     print("\n" + "="*60)
@@ -319,12 +317,21 @@ def analyze_sector_concentration(df, pred_col='y_prob', latest_date=None):
     print(f"Date: {latest_date.date()}")
     print(f"Total holdings: {len(holdings)}")
     print(f"\nTop 20 holdings:")
+    # Get BOTH long and short positions
+    long_holdings = df[(df['date'] == latest_date) & (df['position'] == 1)]
+    short_holdings = df[(df['date'] == latest_date) & (df['position'] == -1)]
     
-    top_20 = df[(df['date'] == latest_date) & (df['position'] == 1)].nlargest(20, pred_col)
-    print(top_20)
-    #exit()
-    for idx, row in top_20.iterrows():
-        print(f"  {row['ticker']:>6s}: {row[pred_col]:.3f}")
+    print(f"\nLong positions: {len(long_holdings)}")
+    print(f"Short positions: {len(short_holdings)}")
+    print(f"Total positions: {len(long_holdings) + len(short_holdings)}")
+    
+    print(f"Average prediction this month: {df['y_prob'].mean():.3f}")
+    print(f"\nTop 20 LONG holdings:")
+    print(long_holdings.nlargest(20, pred_col)[['ticker', pred_col, 'position']])
+    
+    print(f"\nTop 20 SHORT holdings:")
+    print(short_holdings.nsmallest(20, pred_col)[['ticker', pred_col, 'position']])
+
     
     print(f"\n⚠️  Manual check required:")
     print(f"  Look up these tickers and check if they're mostly:")

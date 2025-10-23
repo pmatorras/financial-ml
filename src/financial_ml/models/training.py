@@ -140,7 +140,7 @@ def train(args):
     models = get_models()
     trained_models = {}
     print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
-    models_to_run = models.items() if args.model is None else [(args.model, models[args.model])]
+    models_to_run = models.items() if 'all' in args.model else [(args.model, models[args.model])]
 
     for name, pipe in models_to_run:
         print(f"Training {get_model_name(name)}")

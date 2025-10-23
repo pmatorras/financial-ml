@@ -31,7 +31,7 @@ def cli():
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
         sp.add_argument("--only-market", dest="only_market",
                          help="Explicitly don't include fundamentals in training features", action="store_true")
-        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='rf', choices= ["logreg_l1", "logreg_l2", "rf", "gb"])
+        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb"])
 
     return parser
 

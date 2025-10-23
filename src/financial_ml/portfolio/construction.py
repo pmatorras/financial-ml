@@ -32,7 +32,6 @@ def smooth_predictions(df, window=3):
         DataFrame with added 'y_prob_smooth' column
     """
     df = df.sort_values(['ticker', 'date'])
-    
     # For each ticker, smooth y_prob over time
     df['y_prob_smooth'] = df.groupby('ticker')['y_prob'].transform(
         lambda x: x.rolling(window=window, min_periods=1).mean()

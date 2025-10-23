@@ -22,7 +22,7 @@ def run_backtest(args, per_top=10, per_bot=10):
         per_bot: Percentage of bottom stocks to short
     """
     # Load Data for predictions, stocks, and SPY benchmark
-    model = args.model
+    model = 'rf_cal' if 'all' in args.model else args.model
     print("making calculations for", model)
     preds_nm = get_prediction_file(args)
     preds = pd.read_csv(preds_nm)
@@ -45,6 +45,16 @@ def run_backtest(args, per_top=10, per_bot=10):
     # Filter to best model (Logistic L2)
     df = df[df['model'] == model].copy()
     df = smooth_predictions(df, window=3)
+    stocks_per_date = df.groupby('date')['ticker'].nunique()
+    median_stocks = stocks_per_date.median()
+    
+    # Filter out dates with less than 50% of typical stock count
+    complete_dates = stocks_per_date[stocks_per_date > (median_stocks * 0.5)].index
+    df = df[df['date'].isin(complete_dates)]
+    
+    print(f"\n=== DATA FILTERING ===")
+    print(f"Removed {len(stocks_per_date) - len(complete_dates)} incomplete dates")
+    print(f"Backtest period: {df['date'].min().date()} to {df['date'].max().date()}")
 
     print("\n=== PREDICTIONS DATA ===")
     print(f"Total prediction rows: {len(preds)}")
