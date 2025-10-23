@@ -244,3 +244,77 @@ def create_binary_labels(prices, spy_benchmark):
     # Classification label: excess > 0
     y = (excess_fwd12 > 0).astype(int)
     return y
+
+def calculate_enhanced_features(df):
+    """
+    Calculate enhanced features on long-format dataframe.
+    
+    Experiments (Oct 2025) showed these features hurt performance:
+    - Ranks: -0.007 AUC (Fold 3: -0.031)
+    - Interactions: -0.003 AUC
+    - Reversal: -0.002 AUC
+    Kept for:
+    - Future experimentation
+    - Different targets (absolute returns)
+    - Different models (linear models may benefit)
+    Args:
+        df: DataFrame (potentially with MultiIndex) containing features
+    
+    Returns:
+        Dictionary of {feature_name: Series}
+    """
+    enhanced = {}
+    
+    # Reset index to get access to date/ticker columns
+    df_work = df.copy()
+    
+    # If it has MultiIndex, reset it
+    if isinstance(df_work.index, pd.MultiIndex):
+        df_work = df_work.reset_index()
+    
+    # Debug: check what columns we have
+    print(f"Columns available: {df_work.columns.tolist()}")
+    
+    # Find the date column (might be named differently)
+    date_col = None
+    for col in df_work.columns:
+        if 'date' in str(col).lower() or col == 'level_0':
+            date_col = col
+            break
+    
+    if date_col is None:
+        print("WARNING: Cannot find date column, skipping enhanced features")
+        return enhanced
+    
+    print(f"Using '{date_col}' as date column for grouping")
+    # ===== Option 1. use crossectional ranks =====
+    rank_cols = ['BookToMarket', 'ROE', 'ROA', 'mom121', 'vol12', 'LogMktCap', 'r12']
+    
+    for col in rank_cols:
+        if col in df_work.columns:
+            try:
+                enhanced[f'{col}_rank'] = df_work.groupby(date_col)[col].rank(pct=True)
+                print(f"  ✓ Added {col}_rank")
+            except Exception as e:
+                print(f"  ✗ Failed to rank {col}: {e}")
+    # ===== Option 2. INTERACTION FEATURES =====
+    if 'BookToMarket' in df_work.columns and 'LogMktCap' in df_work.columns:
+        enhanced['value_size'] = df_work['BookToMarket'] * df_work['LogMktCap']
+        print("  ✓ Added value_size")
+    
+    if 'mom121' in df_work.columns and 'ROE' in df_work.columns:
+        enhanced['mom_quality'] = df_work['mom121'] * df_work['ROE']
+        print("  ✓ Added mom_quality")
+    
+    if 'r12' in df_work.columns and 'vol12' in df_work.columns:
+        enhanced['sharpe_12m'] = df_work['r12'] / (df_work['vol12'] + 0.001)
+        print("  ✓ Added sharpe_12m")
+
+    # ===== Option 3. monthly reversal =====
+    if 'r1' in df_work.columns:
+        enhanced['reversal_1m'] = -df_work['r1']
+        print("  ✓ Added reversal_1m")
+
+    print(f"\nTotal enhanced features created: {len(enhanced)}")
+    
+    return enhanced

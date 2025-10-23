@@ -17,7 +17,7 @@ from financial_ml.data import (
     widen_by_canonical
 ) 
 
-
+from financial_ml.data.features import calculate_enhanced_features
 
 
 
@@ -73,6 +73,31 @@ def train(args):
 
     if not args.only_market:
         compute_fundamental_ratios(feat_long, args)
+
+    # ===== ADD ENHANCED FEATURES HERE =====
+    if hasattr(args, 'use_enhanced') and args.use_enhanced:
+        print("\n=== CALCULATING ENHANCED FEATURES ===")
+        
+        feat_reset = feat_long.reset_index()
+        enhanced_dict = calculate_enhanced_features(feat_reset)
+        
+        # Features that will be replaced by their ranks
+        features_to_rank = ['BookToMarket', 'ROE', 'ROA', 'mom121', 'vol12', 'LogMktCap', 'r12']
+        
+        # Remove raw versions if we're adding ranked versions
+        for feat in features_to_rank:
+            rank_key = f'{feat}_rank'
+            if rank_key in enhanced_dict and feat in input_keys:
+                print(f"  Replacing {feat} with {rank_key}")
+                input_keys.remove(feat)  # Remove raw
+        
+        # Add enhanced features
+        for key, values in enhanced_dict.items():
+            feat_long[key] = values.values
+            if key not in input_keys:
+                input_keys.append(key)
+
+    # ===== END ENHANCED FEATURES =====
     #Add the Y to the datafrane
     y_long = y.stack().rename("y")
     df = feat_long.join(y_long, how="inner")
