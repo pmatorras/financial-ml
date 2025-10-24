@@ -51,18 +51,18 @@ CalibratedClassifierCV with isotonic regression (cv=3)
 
 | Metric | Original RF | Calibrated RF | Change |
 |--------|-------------|---------------|--------|
-| Mean y_prob | 0.487 | 0.502 | ✅ Fixed |
-| Std y_prob | 0.035 | 0.059 | ✅ +68% (better separation) |
-| Test AUC | 0.554 | 0.557 | ✅ +0.3pp |
-| Sharpe Ratio | 0.71 | 0.80 | ✅ +13% |
-| Annual Alpha | 0.87% | 2.29% | ✅ +163% |
-| Max Drawdown | -22.8% | -21.5% | ✅ Better |
+| Mean y_prob | 0.487 | 0.502 |  Fixed |
+| Std y_prob | 0.035 | 0.059 |  +68% (better separation) |
+| Test AUC | 0.554 | 0.557 | +0.3pp |
+| Sharpe Ratio | 0.71 | 0.80 |  +13% |
+| Annual Alpha | 0.87% | 2.29% |  +163% |
+| Max Drawdown | -22.8% | -21.5% |  Better |
 
 ### Why It Worked:
 1. Fixed probability scale (mean now 0.502)
 2. Increased prediction spread (std 0.059) → clearer signal for portfolio construction
 3. Better discrimination between good/bad stocks
-4. Top 10% stocks now mostly have prob >0.5 (interpretable)
+4. Top 10% stocks now have prob >0.5 (interpretable)
 
 ### Decision: Use RF_cal as final model
 
@@ -87,10 +87,10 @@ Combining linear (LogReg) and non-linear (RF) models might capture complementary
 
 | Metric | RF_cal (Best) | Ensemble | Change |
 |--------|---------------|----------|--------|
-| Sharpe Ratio | 0.80 | 0.71 | ❌ -11% |
-| Annual Return | 17.9% | 16.8% | ❌ -1.1% |
-| Max Drawdown | -21.5% | -22.2% | ❌ Worse |
-| Volatility | 17.4% | 18.1% | ❌ +0.7% |
+| Sharpe Ratio | 0.80 | 0.71 |  -11% |
+| Annual Return | 17.9% | 16.8% |  -1.1% |
+| Max Drawdown | -21.5% | -22.2% |  Worse |
+| Volatility | 17.4% | 18.1% |  +0.7% |
 
 ### Why It Failed:
 1. LogReg is weaker (AUC 0.558 vs RF_cal 0.557)
@@ -118,7 +118,7 @@ Raw predictions change significantly month-to-month (mean 5.18%)
 ### Results:
 - Raw prediction change: 5.18% mean
 - After smoothing: 1.93% mean
-- Reduction: 58.7% ✅
+- Reduction: 58.7% 
 
 ### Impact:
 - Reduced turnover (from ~50% to ~42%)
@@ -142,7 +142,7 @@ Raw predictions change significantly month-to-month (mean 5.18%)
 3. Interaction features (4 new): -0.003 AUC
 4. Combinations of above: All worse
 
-**Key Finding:** Every enhancement hurt performance, especially on recent data (Fold 3: 2021-2025)
+**Key Finding:** Every tried enhancement worsened the performance, especially on recent data (Fold 3: 2021-2025)
 
 **Why Enhancements Failed:**
 - **Ranks:** Redundant for tree models (RF learns relative comparisons naturally)
@@ -150,7 +150,7 @@ Raw predictions change significantly month-to-month (mean 5.18%)
 - **Reversal:** Pure noise, no new information
 - **All:** Overfit to historical patterns, fail on recent data
 
-**Conclusion:** Baseline 14 raw features is optimal. Simplicity > complexity.
+**Conclusion:** Baseline 14 raw features is preferred.
 
 **Key Learning:** In ML, more features often means worse generalization. Constrained models (max_depth=3) need carefully selected features, not exhaustive transformations.
 

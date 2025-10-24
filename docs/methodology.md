@@ -425,7 +425,7 @@ Results:
 - T-statistic: 6.53
 - P-value: <0.001
 - Bonferroni adjustment: p < 0.0167 (tested 3 models)
-- Result: ✅ Statistically significant
+- Result: Statistically significant
 
 ---
 

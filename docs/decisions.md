@@ -19,39 +19,39 @@ This document explains the reasoning behind key design choices in the project.
 ### Decision: Use calibrated Random Forest as final model
 
 ### Why Random Forest Over Logistic Regression?
-✅ **Better performance**
-- RF test AUC: 0.557 vs LogReg 0.558 (similar)
-- RF Sharpe: 0.71 vs LogReg ~0.65 (better)
+1. **Better performance**
+    - RF test AUC: 0.557 vs LogReg 0.558 (similar)
+    - RF Sharpe: 0.71 vs LogReg ~0.65 (better)
 
-✅ **Captures non-linearities**
-- Stock returns are not linear in factors
-- Interactions matter (e.g., value works differently in small vs large caps)
+2. **Captures non-linearities**
+    - Stock returns are not linear in factors
+    - Interactions matter (e.g., value works differently in small vs large caps)
 
-✅ **Robust to outliers**
-- Tree-based models less sensitive to extreme values
-- No need for extensive outlier treatment
+3. **Robust to outliers**
+    - Tree-based models less sensitive to extreme values
+    - No need for extensive outlier treatment
 
 ### Why Constrained (max_depth=3)?
-✅ **Prevents overfitting**
-- Deep trees: Test AUC drops to 0.52
-- Shallow trees: Generalize better
+1. **Prevents overfitting**
+    - Deep trees: Test AUC drops to 0.52
+    - Shallow trees: Generalize better
 
-✅ **Interpretability**
-- Depth=3 means max 8 leaf nodes per tree
-- Easier to understand decision boundaries
+2. **Interpretability**
+    - Depth=3 means max 8 leaf nodes per tree
+    - Easier to understand decision boundaries
 
 ### Why Calibration?
-✅ **Fixed miscalibrated probabilities**
-- Original: mean 0.487 (predicting only 5.7% beat SPY)
-- Calibrated: mean 0.502 (proper interpretation)
+1. **Fixed miscalibrated probabilities**
+    - Original: mean 0.487 (predicting only 5.7% beat SPY)
+    - Calibrated: mean 0.502 (proper interpretation)
 
-✅ **Improved performance**
-- Sharpe: 0.71 → 0.80 (+13%)
-- Better discrimination (std 0.035 → 0.059)
+2. **Improved performance**
+    - Sharpe: 0.71 → 0.80 (+13%)
+    - Better discrimination (std 0.035 → 0.059)
 
-✅ **Industry standard**
-- Isotonic calibration is well-established
-- Preserves ranking (AUC unchanged)
+3. **Industry standard**
+    - Isotonic calibration is well-established
+    - Preserves ranking
 
 ---
 
@@ -60,16 +60,11 @@ This document explains the reasoning behind key design choices in the project.
 ### Decision: Do NOT use ensemble (LogReg + RF)
 
 ### Why Not Ensemble?
-❌ **Underperformed single model**
-- Ensemble Sharpe: 0.71 vs RF_cal 0.80
-- Diluted the stronger signal
+1. **Underperformed single model:**
+    - Ensemble Sharpe: 0.71 vs RF_cal 0.80 → Weaker model dragged down performance
 
-❌ **Correlation too high (0.556)**
-- Need <0.5 for ensemble diversity
-- Models captured similar patterns
+2. **Correlation too high (0.556)** → Models captured similar patterns
 
-❌ **Weaker model dragged down performance**
-- Averaging RF_cal (strong) with LogReg (weaker) hurt results
 
 ### Key Learning:
 **Ensembles work when:**
@@ -80,7 +75,8 @@ This document explains the reasoning behind key design choices in the project.
 **Our case:**
 - RF_cal clearly superior
 - Moderate correlation (not enough diversity)
-- **Conclusion: Use best single model**
+
+**Conclusion: Use best single model**
 
 ---
 
@@ -89,26 +85,26 @@ This document explains the reasoning behind key design choices in the project.
 ### Decision: Apply 3-month rolling average to predictions
 
 ### Problem:
-Raw predictions volatile month-to-month (5.18% mean change)
+Raw predictions were found to be volatile month-to-month (5.18% mean change)
 
-### Alternatives Tested:
-- No smoothing: High turnover (50%+), noisy
-- 2-month window: Still volatile (4.2% mean change)
-- 3-month window: Optimal (1.93% mean change) ✅
-- 6-month window: Over-smoothed (stale predictions)
+
+**→ Move to a 3-month window:** 
 
 ### Rationale:
-✅ **Reduces noise without losing signal**
-- 58.7% reduction in volatility
-- Sharpe maintained at 0.80
+1. **Reduces noise without losing signal**
+    - 58.7% reduction in volatility
+    - Sharpe maintained at 0.80
 
-✅ **Lowers transaction costs**
-- Turnover: 50% → 42%
-- Cost drag: 1.0% → 0.82%
+2. **Lowers transaction costs**
+    - Turnover: 50% → 42%
+    - Cost drag: 1.0% → 0.82%
 
-✅ **Smoother returns**
-- Less month-to-month volatility in portfolio
-- Better investor experience
+3. **Smoother returns**
+    - Less month-to-month volatility  (1.93% mean change) in portfolio
+    - Better investor experience
+
+4. **Align the information to fundamentals**
+
 
 ### Implementation:
 
@@ -124,22 +120,22 @@ df['y_prob_smooth'] = df.groupby('ticker')['y_prob'].rolling(3, min_periods=1).m
 ### Decision: Use expanding window (not sliding window)
 
 ### Why Expanding?
-✅ **Uses all available data**
-- Later folds have more training data
-- Better estimates as time progresses
+1. **Uses all available data**
+    - Later folds have more training data
+    - Better estimates as time progresses
 
-✅ **More realistic**
-- In production, you'd use all historical data
-- Mimics actual deployment
+2. **More realistic**
+    - In production, you'd use all historical data
+    - Mimics actual deployment
 
-✅ **Reduces variance**
-- More training data → stabler models
-- Fewer overfitting issues
+3. **Reduces variance**
+    - More training data → stabler models
+    - Fewer overfitting issues
 
 ### Why Not Sliding Window?
-❌ Throws away old data
-❌ Smaller training sets
-❌ Less stable models over time
+- Throws away old data
+- Smaller training sets
+- Less stable models over time
 
 ---
 
@@ -153,13 +149,13 @@ df['y_prob_smooth'] = df.groupby('ticker')['y_prob'].rolling(3, min_periods=1).m
 - Market impact: 5 bps (small orders, moderate liquidity)
 
 ### Rationale:
-✅ **Conservative but realistic**
-- S&P 500 stocks are liquid
-- Institutional execution typically 5-15 bps
+- **Conservative but realistic**
+    - S&P 500 stocks are liquid
+    - Institutional execution typically 5-15 bps
 
-✅ **Sensitive to AUM**
-- Works for <$100M strategies
-- Larger funds would face higher costs
+- **Sensitive to AUM**
+    - Works for <$100M strategies
+    - Larger funds would face higher costs
 
 ### Impact on Results:
 - Gross alpha: ~3.0%
