@@ -2,6 +2,16 @@
 
 This document tracks all model experiments and design choices throughout the project development.
 
+## Table of Contents
+
+- [Experiment 1: Base Model Selection](#experiment-1-base-model-selection)
+- [Experiment 2: Probability Calibration](#experiment-2-probability-calibration)
+- [Experiment 3: Ensemble Testing](#experiment-3-ensemble-testing)
+- [Experiment 4: Smoothing Impact](#experiment-5-smoothing-impact)
+- [Experiment 5: Feature Engineering](#experiment-5-feature-engineering)
+- [Summary of Final Configuration](#summary-of-final-configuration)
+
+
 ---
 
 ## Experiment 1: Base Model Selection
@@ -95,45 +105,7 @@ Ensembles work when models have similar performance and low correlation (<0.5). 
 
 ---
 
-## Experiment 4: Hyperparameter Tuning
-**Date:** October 22, 2025  
-**Goal:** Optimize Random Forest hyperparameters
-
-### Parameters Tested:
-
-**max_depth:**
-- depth=2: Test AUC 0.53 (underfitting)
-- depth=3: Test AUC 0.557 ✅ (optimal)
-- depth=5: Test AUC 0.55 (overfitting)
-- depth=10: Test AUC 0.52 (severe overfitting)
-
-**n_estimators:**
-- n=30: Test AUC 0.545 (underfitting)
-- n=50: Test AUC 0.557 ✅ (optimal)
-- n=100: Test AUC 0.557 (no improvement, slower)
-
-**min_samples_split:**
-- 0.01: Overfits
-- 0.02: Optimal ✅
-- 0.05: Underfits
-
-### Final Hyperparameters:
-
-```bash
-RandomForestClassifier(
-n_estimators
-50, max_
-epth=3, min_samples
-split=0.02, min_sa
-ples_leaf=0.01,
-ax_features='log2',
-lass_weight='ba)
-```
-
-
----
-
-## Experiment 5: Smoothing Impact
+## Experiment 4: Smoothing Impact
 **Date:** October 23, 2025  
 **Goal:** Reduce month-to-month prediction volatility
 
@@ -158,23 +130,9 @@ Raw predictions change significantly month-to-month (mean 5.18%)
 
 ---
 
-## Summary of Final Configuration
 
-**Model:** Calibrated Random Forest (CalibratedClassifierCV with isotonic regression)
 
-**Key Design Choices:**
-- ✅ Calibration over raw probabilities
-- ✅ Single model over ensemble
-- ✅ Constrained RF (max_depth=3) over deep trees
-- ✅ 3-month smoothing for stability
-- ✅ Top/bottom 10% portfolio construction
-
-**Performance:**
-- Sharpe Ratio: 0.80
-- Annual Alpha: 2.29%
-- Statistical significance: p < 0.001 (Bonferroni-adjusted)
-
-## Experiment 5: Feature Engineering Ablation (Oct 23, 2025)
+## Experiment 5: Feature Engineering
 
 **Goal:** Test if engineered features improve baseline performance
 
@@ -195,3 +153,21 @@ Raw predictions change significantly month-to-month (mean 5.18%)
 **Conclusion:** Baseline 14 raw features is optimal. Simplicity > complexity.
 
 **Key Learning:** In ML, more features often means worse generalization. Constrained models (max_depth=3) need carefully selected features, not exhaustive transformations.
+
+---
+
+## Summary of Final Configuration
+
+**Model:** Calibrated Random Forest (CalibratedClassifierCV with isotonic regression)
+
+**Key Design Choices:**
+- ✅ Calibration over raw probabilities
+- ✅ Single model over ensemble
+- ✅ Constrained RF (max_depth=3) over deep trees
+- ✅ 3-month smoothing for stability
+- ✅ Top/bottom 10% portfolio construction
+
+**Performance:**
+- Sharpe Ratio: 0.80
+- Annual Alpha: 2.29%
+- Statistical significance: p < 0.001 (Bonferroni-adjusted)

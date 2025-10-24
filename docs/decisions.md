@@ -2,8 +2,16 @@
 
 This document explains the reasoning behind key design choices in the project.
 
----
 
+## Table of Contents
+
+- [1. Model Choice: Random Forest (Calibrated)](#1-model-choice-random-forest-calibrated)
+- [2. Ensemble: Rejected](#2-ensemble-rejected)
+- [3. Smoothing: 3-Month Window](#3-smoothing-3-month-window)
+- [4. Time Series CV: Expanding Window](#4-time-series-cv-expanding-window)
+- [5. Transaction Costs: 10 bps](#5-transaction-costs-10-bps)
+- [Summary: Key Principles](#summary-key-principles)
+---
 
 
 ## 1. Model Choice: Random Forest (Calibrated)
