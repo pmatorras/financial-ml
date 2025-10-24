@@ -2,7 +2,23 @@
 
 A machine learning system for equity selection that predicts which S&P 500 stocks will outperform the market benchmark. The project combines market data with company fundamentals to construct long/short portfolios, using time series cross-validation to prevent lookahead bias and comprehensive backtesting to validate performance against SPY. The goal: identify stocks with positive alpha while maintaining robust risk management through systematic validation at both model and portfolio levels
 
+## Key Results
 
+| Metric | Strategy | SPY Benchmark | Difference |
+|--------|----------|---------------|------------|
+| **Sharpe Ratio** | **0.80** | 0.55 | +45% |
+| **Annual Return** | **17.9%** | 13.5% | +4.4% |
+| **Annual Alpha** | **2.29%** | -| - |
+| **Max Drawdown** | **-21.5%** | -24.0% | Better |
+| **Total Return (2016-2025)** | **323.6%** | ~190% | +133% |
+| **Win Rate** | **67%** | - | - |
+
+
+- **Statistically significance:** p < 0.001 (Bonferroni-adjusted, 3-model comparison)  
+- **Transaction costs included:** After including an estimation of transaction costs , Net alpha → 2.18% after 0.82% annual drag  
+- **Robustness across regimes:** Outperformed in COVID crash (-21.5% vs -24%) and in 2022 bear market
+
+- Including a **Probability calibration** (isotonic regression) improved Sharpe from 0.71 → 0.80 (+13%)
 ## Pipeline Architecture
 
 The pipeline of this project follows a standard MLOps workflow: data ingestion → feature engineering → model training with time series cross-validation → portfolio construction → backtesting.
@@ -21,36 +37,13 @@ flowchart TD
 ## Table of Contents
 - [Features](#features)
 - [Project structure](#project-structure)
-    - [Source code](#source-code)
-    - [Generated dfirectories](#generated-directories)
-    - [Module overview](#module-overview)
 - [Installation](#installation)
 - [Quick start](#quick-start)
-    - [Global flags](#global-flags)
 - [Data Collection](#data-collection)
-    - [Usage](#data-usage)
-    - [Data Sources](#data-sources)
-    - [Output files](#data-output)
-    - [Target variable](#target-variable)
-- [Modelling](#modelling-and-evaluation)
-    - [Usage](#modelling-usage)
-    - [Discriminating variables](#discriminating-variables)
-    - [ML Models](#ml-models)
-    - [Cross-Validation](#cross-validation)
-    - [Output files](#modelling-output)
+- [Modelling](#modelling)
 - [Evaluation](#evaluation)
-    - [Usage](#evaluation-usage)
-    - [Output files](#evaluation-output)
-
 - [Portfolio construction and backtesting](#portfolio-construction-and-backtesting)
-    - [Usage](#portfolio-usage)
-    - [Portfolio construction](#portfolio-construction)
-    - [Metrics](#metrics)
-    - [Diagnostics](#diagnostics)
-    - [Output files](#portfolio-output)
-
-- [Possible future extensions](#possible-future-extensions)
-- [Notes and compliance](#Notes_and_compliance)
+- [Documentation](#documentation)
 
 
 
@@ -66,156 +59,44 @@ flowchart TD
 - Use the predictions for the best and worst performing tickers to generate portfolios following different strategies, to try and beat the market.
 - Assess the model robustness and the qualities of the portfolios (e.g. Sharpe ratios,  profits, risks, volatity vs SPY). 
 
-
 ## Project structure
-
-- Entrypoint and CLI flags live in the main module (`src/financial_ml/`) that dispatches data collection, training, and fundamentals jobs.
-- Market data ingestion and symbol management are encapsulated in the markets module, and fundamentals ingestion in the fundamentals module.
-- The training pipeline, feature engineering, labeling, cross-validation, and metric reporting are implemented in the train module.
-
-### Source Code
-The current structure of `src/financial_ml` is as follows:
+The project is structured as follows (**For a more detailed explanation please refer to** [`docs/methodology.md`](docs/methodology.md)
+):
+```bash
+financial-ml/
+├── src/financial_ml/ # Source code
+│ ├── data/ # Data pipeline & feature engineering
+│ ├── models/ # Training with time series CV
+│ ├── evaluation/ # Model diagnostics
+│ └── portfolio/ # Backtesting & construction
+├── docs/ # Technical documentation
+├── figures/ # Performance charts
+└── requirements.txt
 ```
-src/financial_ml/
-│
-├── __init__.py                      # Package initialization
-├── __main__.py                      # Entry point: python -m financial_ml
-├── main.py                          # CLI command routing
-│
-├── data/                            # Data loading and processing
-│   ├── __init__.py                  # (Optional) Public API for loaders
-│   ├── loaders.py                   # Load market/fundamental data from CSV
-│   ├── features.py                  # Feature engineering (market features, ratios)
-│   ├── validation.py                # Data quality checks (require_non_empty, etc.)
-│   └── collectors/                  # External data collection
-│       ├── __init__.py              # Exports: collect_market_data, collect_fundamentals
-│       ├── market_data.py           # Download stock prices from yfinance
-│       └── fundamental_data.py      # Download fundamentals from SEC EDGAR
-│
-├── models/                          # Model training and definitions
-│   ├── __init__.py                  # Exports: train, get_models, get_model_name
-│   ├── training.py                  # Train models with time-series CV
-│   └── definitions.py               # Model pipeline definitions (LogReg, RF)
-│
-├── evaluation/                      # Model analysis and evaluation
-│   ├── __init__.py                  # Exports: analyze_models
-│   ├── analyze.py                   # Load models and run analysis
-│   └── feature_analysis.py          # Feature importance, coefficients
-│
-├── portfolio/                       # Backtesting and portfolio construction
-│   ├── __init__.py                  # Exports: run_backtest
-│   ├── backtest.py                  # Main backtesting orchestration
-│   ├── construction.py              # Portfolio construction (positions, smoothing)
-│   ├── performance.py               # Return calculation and metrics
-│   ├── diagnostics.py               # Model agreement, turnover, beta analysis
-│   └── visualization.py             # Plotting (cumulative returns, drawdown)
-│
-└── utils/                           # Utilities and configuration
-    ├── config.py                    # Constants (DATA_DIR, MARKET_KEYS, etc.)
-    ├── paths.py                     # Path helpers (get_prediction_file, etc.)
-    └── helpers.py                   # Common utilities (safe_div, etc.)
-```
-***
-### Generated Directories
 
-These directories are created automatically during execution:
+### Key Modules
 
-```
-data/                                # Raw and processed data
-├── market/                          # Stock price data (CSV)
-├── fundamentals/                    # SEC EDGAR fundamental data (CSV)
-└── predictions/                     # Model predictions (CSV)
-    ├── production/                  # Full dataset predictions
-    └── debug/                       # Test subset predictions
+**Data Pipeline (`data/`):**
+- Downloads market data (yfinance) and fundamentals (SEC EDGAR)
+- Engineers 14 features (momentum, value, quality, risk)
+- Handles missing data and forward-fills quarterly fundamentals
 
-models/                              # Trained model artifacts
-├── production/                      # Models trained on full dataset
-│   ├── logreg_l1.pkl
-│   ├── logreg_l2.pkl
-│   ├── rf.pkl
-│   └── feature_names.txt
-└── debug/                           # Models trained on test subset
+**Model Training (`models/`):**
+- 3-fold expanding window time series CV
+- Trains Random Forest + isotonic calibration
+- Saves trained models and predictions
 
-figures/                             # Generated plots and visualizations
-├── portfolio_backtest_*.png         # Portfolio performance charts
-└── feature_importance_*.png         # Feature analysis charts
+**Evaluation (`evaluation/`):**
+- Feature importance analysis
+- Model diagnostics (AUC, calibration metrics)
+- Cross-fold performance comparison
 
-debug/                               # Debug outputs (when --debug flag used)
-├── funda.csv                        # Raw fundamentals snapshot
-├── monthly.csv                      # Monthly resampled data
-└── *.csv                            # Other debug CSVs
-
-logs/                                # Application logs (if implemented)
-```
-This structure keeps the logic compartmentalized:
-- `core/` centralises configuration and utilities. General paths are centralised through these scripts, with `data/`, `figures/`, and `logs/` auto-created on first run.
-- `data/` manages loading, cleaning, and labeling.
-- `features/` handles transformation and feature engineering.
-- `models/` encapsulates model workflows and portfolio logic.
-- `viz/` contains both charts and dashboards for performance and exploration.The 
-- `cli/` directory aligns with the earlier design’s modular entrypoint for reproducible workflows (market, fundamentals, train, plot...).
-
-This makes the repository scalable for predictive modeling, portfolio backtesting, and visualization, while keeping all paths consistent with professional ML deployment standards
-***
-### Module overview
-
-#### 📊 Data Module
-
-Load, validate, and engineer features from market and fundamental data.
-
-**Key Components:**
-
-- **Loaders** - Read processed CSV data (market prices, fundamentals)
-- **Features** - Calculate market indicators and fundamental ratios
-- **Collectors** - Download data from yfinance and SEC EDGAR APIs
-- **Validation** - Data quality checks and assertions
+**Portfolio Construction (`portfolio/`):**
+- Selects top/bottom 10% stocks by predicted probability
+- Constructs equal-weighted long/short portfolios
+- Backtests against SPY benchmark
 
 
-#### 🤖 Models Module
-
-Define and train ML models with time-series cross-validation.
-
-**Supported Models:**
-
-- Logistic Regression (L1/L2 regularization)
-- Random Forest Classifier
-
-**Features:**
-
-- Time-series CV to prevent lookahead bias
-- Hyperparameter-tuned pipelines
-- Model persistence with joblib
-
-
-#### 📈 Evaluation Module
-
-Analyze trained model performance and feature importance.
-
-**Capabilities:**
-
-- Load saved models without retraining
-- Extract feature importance/coefficients
-- Visualize model behavior
-
-
-#### 💼 Portfolio Module
-
-Construct portfolios from predictions and run comprehensive backtests.
-
-**Features:**
-
-- Long/short portfolio construction
-- Prediction smoothing (reduce noise)
-- Performance metrics (Sharpe, drawdown, returns)
-- Diagnostic analysis (turnover, beta, model agreement)
-- Compare to benchmark (SPY)
-
-
-#### 🔧 Utils Module
-
-Shared configuration, paths, and utility functions that can be accesible from all over the repository.
-
-***
 
 ## Installation
 
@@ -245,7 +126,7 @@ pip install -r Requirements.txt
 pip install -e .
 ```
 
-**Note:** The package will be installed as `financial_ml` and can be run via `python -m financial_ml <command>`.
+>**Note:** The package will be installed as `financial_ml` and can be run via `python -m financial_ml <command>`.
 
 ## Quick start
 
@@ -336,7 +217,7 @@ python -m financial_ml fundamentals --test
 ```
 **Caching behaviour:** By default, data files are only downloaded if they don't already exist. Use `--newtable` and `--newinfo` to force refresh.
 
-> **Design note:** Market data collection and fundamentals collection are separate commands to enable independent execution. You can update constituents and prices without re-fetching fundamentals, or vice versa.
+> **Note:** Market data collection and fundamentals collection are separate commands to enable independent execution. You can update constituents and prices without re-fetching fundamentals, or vice versa.
 
 ### Data sources 
 Two types of data are currently considered: market and fundamental data:
@@ -389,38 +270,36 @@ python -m financial_ml train --no-fundamentals
 
 **Command specific tags**
 - `--no-fundamentals` - Train using only market data (excludes fundamental ratios)
-### Discriminating variables
 
-Currently, the model takes information from both the market stock information (monthly basis), and (quaterly) fundamentals:
+### Features
 
-#### Variables from market behaviours:
+The model uses **14 features** spanning market and fundamental factors:
 
-- `r1` (1m return): Captures the most recent monthly price move, providing a highly responsive but noisy signal that helps models account for short‑term dynamics and potential reversal pressure.
+**Market Signals (5):**
+- Momentum: `r12`, `mom121` (12-month trend)
+- Volatility: `vol3`, `vol12` (risk measures)
+- Price: `ClosePrice` (behavioral signal)
 
-- `r12` (12m return): Summarizes the past year’s trend including the latest month, offering a strong baseline momentum proxy that can be tempered with risk controls for stability.
+**Fundamental Ratios (9):**
+- Value: `BookToMarket`
+- Quality: `ROE`, `ROA`, `NetMargin`
+- Structure: `Leverage`, `AssetGrowth`, `NetShareIssuance`
+- Size: `LogMktCap`
 
-- `mom121` (12m − 1m momentum): Focuses on medium‑term trend by excluding the most recent month, reducing short‑term reversal effects and typically improving persistence out of sample.
+>Full feature definitions and formulas in [`docs/methodology.md`](docs/methodology.md).
 
-- `vol3` (3m rolling std): Fast‑moving realized volatility over three months that reacts to recent shocks, useful for volatility‑managed scaling and down‑weighting unstable names.
+### Feature Importance:
+Top 4 features (Size, Volatility, Price, Value) account for 74% of model decisions.
+| Feature | Mean Importance | Interpretation |
+|---------|----------------|----------------|
+| **LogMktCap** | 37.5% ± 28.7% | Market cap (size premium) |
+| **vol12** | 15.9% ± 16.7% | 12-month volatility (risk) |
+| **ClosePrice** | 13.4% ± 16.1% | Price level (behavioral) |
+| **BookToMarket** | 8.0% ± 9.9% | Value ratio |
 
-- `vol12` (12m rolling std): Slower, more structural risk estimate over a full year that complements vol3 by distinguishing transient turbulence from persistent volatility regimes.
-***
-#### Variables from fundamentals
+![Feature Importance](figures/importance_rf_cal.png)
 
-The following variables are taken from the stock fundamentals:
-
-- Book-to-Market (`B/M`):  captures valuation relative to book value and is a canonical factor in asset pricing and cross-sectional models. $B/M=\frac{Equity}{Price\times Shares}$
-- Return on Equity (`ROE`):  measures profitability to equity holders and proxies the profitability factor component in five-factor frameworks. $ROE=\frac{Net Income_{TTM}}{Equity}$
-- Return on Assets (`ROA`):  complements ROE by controlling for capital structure and overall asset base. $ROA=\frac{Net Income_{TTM}}{Assets}$
-- `Net Margin`: gauges earnings efficiency and is routinely used in fundamental screens and profitability diagnostics.  $Net Margin=\frac{Net Income_{TTM}}{Revenues_{TTM}}$
-- `Leverage`:  captures balance-sheet risk and interacts with profitability and value in expected return models. $Leverage=\frac{Liabilities}{Assets}$
-- `Asset Growth` (Investment):  maps to the investment factor where higher investment has been associated with lower average returns. $Inv=\frac{Assets_{t}-Assets_{t-4q}}{Assets_{t-4q}}$
-- `Net Share Issuance`:  tracks dilution/buybacks and has documented predictive power for subsequent returns. $Issuance=\frac{Shares_{t}-Shares_{t-4q}}{Shares_{t-4q}}$
-- Size (`marketCap`):  provides a standard size control that stabilizes cross-sectional comparisons. $\log(Market Cap)=\log(Price\times Shares) $
-
- This set targets value, profitability, investment, leverage, size, and dilution, which align with widely used multi-factor models and documented cross-sectional return predictors.
-
-***
+> **Note:** Relatively large standard deviations reflect varying importance across folds/regimes. For example, vol12 was more critical during COVID (Fold 2) than in bull markets. This adaptability is thus desirable as the goal is for the model to adjust to market conditions rather than rigidly relying on fixed features.
 
 ### ML Models 
 
@@ -428,7 +307,9 @@ Three binary classifiers predict monthly stock outperformance vs. SPY benchmark:
 
 - **Logistic Regression (L1)** - Lasso regularization, `C=0.5`
 - **Logistic Regression (L2)** - Ridge regularization, `C=1.0`
-- **Random Forest** - 50 trees, `max_depth=4`
+- **Random Forest** - 50 trees, `max_depth=3`
+- **Random Forest (Calibrated)** ← **Production model**
+
 
 > **Configuration:** See [`models/definitions.py`](src/financial_ml/models/definitions.py) for complete pipeline specifications.
 
@@ -439,19 +320,53 @@ Three binary classifiers predict monthly stock outperformance vs. SPY benchmark:
 - Scale features → `StandardScaler` (linear models only)
 - Balance classes → `class_weight='balanced'`
 
+> Full model specifications: [`src/financial_ml/models/definitions.py`](src/financial_ml/models/definitions.py)
+### Model Selection
 
+Multiple models were evaluated using 3-fold time series cross-validation:
+
+| Model | Test AUC | Sharpe Ratio | Alpha |
+|-------|----------|--------------|-------|
+| Logistic Regression L2 | 0.558 | ~0.65 | 1.5% |
+| Random Forest | 0.554 | 0.71 | 0.87% |
+| **Random Forest (Calibrated)** | **0.557** | **0.80** | **2.29%** |
+| Combination (LogReg+RF) | 0.556 | 0.71 | 2.18% | 
+
+**Final Model:** Calibrated Random Forest (`CalibratedClassifierCV` with isotonic regression)
+
+Chosen model: **Random forest (Calibrated)**
+- Shows the highest risk-adjusted returns (Sharpe 0.80)
+- Superior alpha generation (2.29% vs competitors)
+- Properly calibrated probabilities (mean 0.502 vs uncalibrated 0.487)
+- Best performance on recent data (2021-2025 test fold)
+
+**Alternative approaches tested:**
+- Enhanced features (ranks, interactions): Reduced performance (-0.004 AUC)
+- Model ensembles: Diluted signal, no improvement
+
+> See [`docs/experiments.md`](docs/experiments.md) for a more in depth description of the studies.
 ### Cross-Validation
 
-Time-series split with **3 folds** and **36-month test windows** per fold. This expanding-window approach prevents lookahead bias and simulates realistic backtesting conditions.
+**3-fold expanding window time series CV** to mimic production and prevent lookahead bias and data leakage:
 
-**Metric:** AUC-ROC score logged for each model and fold.
+| Fold | Train Period | Test Period | Test AUC |
+|------|--------------|-------------|----------|
+| 1 | 2010-2016 (6 yrs) | 2016-2018 (2 yrs) | 0.563 |
+| 2 | 2010-2018 (8 yrs) | 2018-2021 (3 yrs) | 0.566 |
+| 3 | 2010-2021 (11 yrs) | 2021-2025 (4 yrs) | 0.543 |
+
+**Average Test AUC:** 0.557
+
+**Metric:** AUC-ROC, reported per fold for transparency.
+
+
 
 <a id="modelling-output"></a>
 ### Output Files
 
 | File | Description |
 | :-- | :-- |
-| `data/predictions/production/predictions_{model}.csv` | Out-of-fold predictions with `date`, `ticker`, `y_true`, `y_prob`, `y_pred`, `fold`, `model` |
+| `data/predictions/production/predictions_{model}.csv` | Out-of-fold predictions with probabilities |
 | `models/production/{model}.pkl` | Trained model artifacts (serialized with joblib) |
 | `models/production/feature_names.txt` | List of features used in training |
 
@@ -543,23 +458,15 @@ python -m financial_ml portfolio --model logreg_l1
 
 ***
 
-### Possible future extensions
 
-- Extend fundamentals information to earlier dates: 
-    - Challenging since EDGAR API cannot be used
-- Add alternative data sources (e.g sentiment)
-- Extend to international markets.
-- Residual momentum: A stock’s trend after removing broad market/factor co‑movement, highlighting stock‑specific persistence rather than index‑driven moves.
-- 12‑month drawdown: The percent distance of the current price from its highest level over the past year, summarizing recent loss severity and recovery state.
-- Gross Profitability: $\frac{Sales-COGS}{Assets}$ (requires [COGS](https://en.wikipedia.org/wiki/Cost_of_goods_sold)) is a strong profitability proxy complementary to ROE/ROA in cross-sectional models.
-- Accruals ([Sloan](https://quantpedia.com/strategies/accrual-anomaly)): requires cash flow from operations and current working-capital components to estimate accrual intensity, which is often predictive of returns.
+## Documentation
 
+This README provides a high-level overview. For detailed information, please refer to:
 
-## Notes and compliance
+- **[`docs/experiments.md`](docs/experiments.md)** - Complete ablation studies, rejected approaches, lessons learned
+- **[`docs/methodology.md`](docs/methodology.md)** - Technical implementation details, formulas, model specifications
+- **[`docs/decisions.md`](docs/decisions.md)** - Design rationale for key choices (features, rebalancing frequency, etc.)
 
-- Fundamentals ingestion uses a retry-enabled session and a descriptive User-Agent for responsible access to the filings API, and introduces a short sleep between requests.
-- Tickers containing a dot are normalized with a dash for compatibility with the market data API, and the benchmark instrument is appended to the universe.
-- Paths are resolved relative to a repository root two levels up from these modules, and output directories are created if missing.
 
 
 <br><hr>

@@ -3,21 +3,224 @@
 Detailed documentation of the technical approach used in this project.
 
 ---
+## Table of Contents
 
-## 1. Data Pipeline
+- [Project structure](#project-structure)
+    - [Source Code](#source-code)
+    - [Generated Directories](#generated-directories)
+    - [Module overview](#module-overview)
+- [Data Pipeline](#data-pipeline)
+    - [Universe](#universe)
+    - [Data Sources](#data-sources)
+    - [Data Quality](#data-quality)
+- [Feature Engineering](#feature-engineering)
+    - [Market Features (Technical)](#market-features-technical)
+    - [Discriminating variables](#discriminating-variables)
+    - [Feature Scaling](#feature-scaling)
+- [Target Variable](#target-variable)
+    - [Definition](#definition)
+    - [Label Distribution](#label-distribution)
+- [Time Series Cross-Validation](#time-series-cross-validation)
+    - [Strategy](#strategy)
+    - [Critical Safeguards](#critical-safeguards)
+    - [Evaluation Metrics](#evaluation-metrics)
+- [Model Architecture](#model-architecture)
+    - [Base Model: Random Forest](#base-model-random-forest)
+    - [Calibration: Isotonic Regression](#calibration-isotonic-regression)
+- [Portfolio Construction](#portfolio-construction)
+    - [Signal Generation](#signal-generation)
+    - [Position Assignment](#position-assignment)
+    - [Weighting](#weighting)
+    - [Rebalancing](#rebalancing)
+- [Performance Attribution](#performance-attribution)
+    - [Risk-Adjusted Returns](#risk-adjusted-returns)
+    - [Alpha Calculation](#alpha-calculation)
+    - [Statistical Significance](#statistical-significance)
+- [Risk Management](#risk-management)
+    - [Drawdown Analysis](#drawdown-analysis)
+    - [Regime Analysis](#regime-analysis)
+    - [Position Limits](#position-limits)
+- [Transaction Cost Modeling](#transaction-cost-modeling)
+    - [Cost Assumptions](#cost-assumptions)
+    - [Annual Drag Calculation](#annual-drag-calculation)
+    - [Net Alpha](#net-alpha)
+- [Production Considerations](#production-considerations)
+    - [Data Latency](#data-latency)
+    - [Execution](#execution)
+    - [Monitoring](#monitoring)
+- [Known Limitations](#known-limitations)
+    - [Survivorship Bias](#survivorship-bias)
+    - [Market Impact](#market-impact)
+    - [Regime Dependency](#regime-dependency)
+    - [Factor Crowding](#factor-crowding)
+- [Future Improvements](#future-improvements)
 
-### 1.1 Universe
+
+## Project structure
+
+- Entrypoint and CLI flags live in the main module (`src/financial_ml/`) that dispatches data collection, training, and fundamentals jobs.
+- Market data ingestion and symbol management are encapsulated in the markets module, and fundamentals ingestion in the fundamentals module.
+- The training pipeline, feature engineering, labeling, cross-validation, and metric reporting are implemented in the train module.
+
+### Source Code
+The current structure of `src/financial_ml` is as follows:
+```bash
+src/financial_ml/
+│
+├── __init__.py                      # Package initialization
+├── __main__.py                      # Entry point: python -m financial_ml
+├── main.py                          # CLI command routing
+│
+├── data/                            # Data loading and processing
+│   ├── __init__.py                  # (Optional) Public API for loaders
+│   ├── loaders.py                   # Load market/fundamental data from CSV
+│   ├── features.py                  # Feature engineering (market features, ratios)
+│   ├── validation.py                # Data quality checks (require_non_empty, etc.)
+│   └── collectors/                  # External data collection
+│       ├── __init__.py              # Exports: collect_market_data, collect_fundamentals
+│       ├── market_data.py           # Download stock prices from yfinance
+│       └── fundamental_data.py      # Download fundamentals from SEC EDGAR
+│
+├── models/                          # Model training and definitions
+│   ├── __init__.py                  # Exports: train, get_models, get_model_name
+│   ├── training.py                  # Train models with time-series CV
+│   └── definitions.py               # Model pipeline definitions (LogReg, RF)
+│
+├── evaluation/                      # Model analysis and evaluation
+│   ├── __init__.py                  # Exports: analyze_models
+│   ├── analyze.py                   # Load models and run analysis
+│   └── feature_analysis.py          # Feature importance, coefficients
+│
+├── portfolio/                       # Backtesting and portfolio construction
+│   ├── __init__.py                  # Exports: run_backtest
+│   ├── backtest.py                  # Main backtesting orchestration
+│   ├── construction.py              # Portfolio construction (positions, smoothing)
+│   ├── performance.py               # Return calculation and metrics
+│   ├── diagnostics.py               # Model agreement, turnover, beta analysis
+│   └── visualization.py             # Plotting (cumulative returns, drawdown)
+│
+└── utils/                           # Utilities and configuration
+    ├── config.py                    # Constants (DATA_DIR, MARKET_KEYS, etc.)
+    ├── paths.py                     # Path helpers (get_prediction_file, etc.)
+    └── helpers.py                   # Common utilities (safe_div, etc.)
+```
+***
+### Generated Directories
+
+These directories are created automatically during execution:
+
+```bash
+data/                                # Raw and processed data
+├── market/                          # Stock price data (CSV)
+├── fundamentals/                    # SEC EDGAR fundamental data (CSV)
+└── predictions/                     # Model predictions (CSV)
+    ├── production/                  # Full dataset predictions
+    └── debug/                       # Test subset predictions
+
+models/                              # Trained model artifacts
+├── production/                      # Models trained on full dataset
+│   ├── logreg_l1.pkl
+│   ├── logreg_l2.pkl
+│   ├── rf.pkl
+│   └── feature_names.txt
+└── debug/                           # Models trained on test subset
+
+figures/                             # Generated plots and visualizations
+├── portfolio_backtest_*.png         # Portfolio performance charts
+└── feature_importance_*.png         # Feature analysis charts
+
+debug/                               # Debug outputs (when --debug flag used)
+├── funda.csv                        # Raw fundamentals snapshot
+├── monthly.csv                      # Monthly resampled data
+└── *.csv                            # Other debug CSVs
+
+logs/                                # Application logs (if implemented)
+```
+This structure keeps the logic compartmentalized:
+- `core/` centralises configuration and utilities. General paths are centralised through these scripts, with `data/`, `figures/`, and `logs/` auto-created on first run.
+- `data/` manages loading, cleaning, and labeling.
+- `features/` handles transformation and feature engineering.
+- `models/` encapsulates model workflows and portfolio logic.
+- `viz/` contains both charts and dashboards for performance and exploration.The 
+- `cli/` directory aligns with the earlier design’s modular entrypoint for reproducible workflows (market, fundamentals, train, plot...).
+
+This makes the repository scalable for predictive modeling, portfolio backtesting, and visualization, while keeping all paths consistent with professional ML deployment standards
+***
+### Module overview
+
+#### Data Module
+
+Load, validate, and engineer features from market and fundamental data.
+
+**Key Components:**
+
+- **Loaders** - Read processed CSV data (market prices, fundamentals)
+- **Features** - Calculate market indicators and fundamental ratios
+- **Collectors** - Download data from yfinance and SEC EDGAR APIs
+- **Validation** - Data quality checks and assertions
+
+
+#### Models Module
+
+Define and train ML models with time-series cross-validation.
+
+**Supported Models:**
+
+- Logistic Regression (L1/L2 regularization)
+- Random Forest Classifier
+
+**Features:**
+
+- Time-series CV to prevent lookahead bias
+- Hyperparameter-tuned pipelines
+- Model persistence with joblib
+
+
+#### Evaluation Module
+
+Analyze trained model performance and feature importance.
+
+**Capabilities:**
+
+- Load saved models without retraining
+- Extract feature importance/coefficients
+- Visualize model behavior
+
+
+#### Portfolio Module
+
+Construct portfolios from predictions and run comprehensive backtests.
+
+**Features:**
+
+- Long/short portfolio construction
+- Prediction smoothing (reduce noise)
+- Performance metrics (Sharpe, drawdown, returns)
+- Diagnostic analysis (turnover, beta, model agreement)
+- Compare to benchmark (SPY)
+
+
+#### Utils Module
+
+Shared configuration, paths, and utility functions that can be accesible from all over the repository.
+
+***
+
+
+## Data Pipeline
+
+ ### Universe
 - **Source:** S&P 500 constituents
 - **Period:** 2010-2025 (training), 2016-2025 (backtesting)
 - **Frequency:** Monthly rebalancing
 - **Average stocks per month:** ~335 (due to missing data/fundamentals)
 
-### 1.2 Data Sources
+ ### Data Sources
 - **Market data:** Yahoo Finance (prices, volumes)
 - **Fundamental data:** SEC EDGAR API (quarterly filings)
 - **Benchmark:** SPY ETF for market returns
 
-### 1.3 Data Quality
+ ### Data Quality
 - Remove stocks with <24 months history
 - Remove stocks with missing fundamental data
 - Forward-fill quarterly fundamentals to monthly
@@ -25,46 +228,57 @@ Detailed documentation of the technical approach used in this project.
 
 ---
 
-## 2. Feature Engineering
+## Feature Engineering
 
-### 2.1 Market Features (Technical)
+ ### Market Features (Technical)
+### Discriminating variables
 
-**Price-based:**
-- `ClosePrice`: Raw closing price
-- `LogMktCap`: log(price × shares outstanding)
+Currently, the model takes information from both the market stock information (monthly basis), and (quaterly) fundamentals:
 
+#### Variables from market behaviours:
+- `ClosePrice`: Raw stock closing price
 **Momentum:**
-- `r1`: 1-month return
-- `r12`: 12-month return
-- `mom121`: 12-month return skipping most recent month
+- `r1` (1m return): Captures the most recent monthly price move, providing a highly responsive but noisy signal that helps models account for short‑term dynamics and potential reversal pressure.
+
+- `r12` (12m return): Summarizes the past year’s trend including the latest month, offering a strong baseline momentum proxy that can be tempered with risk controls for stability.
+
+- `mom121` (12m − 1m momentum): Focuses on medium‑term trend by excluding the most recent month, reducing short‑term reversal effects and typically improving persistence out of sample.
 
 **Volatility:**
-- `vol3`: 3-month return standard deviation
-- `vol12`: 12-month return standard deviation
+- `vol3` (3m rolling std): Fast‑moving realized volatility over three months that reacts to recent shocks, useful for volatility‑managed scaling and down‑weighting unstable names.
 
-### 2.2 Fundamental Features
+- `vol12` (12m rolling std): Slower, more structural risk estimate over a full year that complements vol3 by distinguishing transient turbulence from persistent volatility regimes.
+***
 
-**Valuation:**
-- `BookToMarket`: Book value / Market cap
 
-**Profitability:**
-- `ROA`: Net Income / Total Assets
-- `ROE`: Net Income / Shareholders Equity
-- `NetMargin`: Net Income / Revenue
+#### Variables from fundamentals
 
-**Financial Health:**
-- `Leverage`: Total Debt / Total Assets
-- `AssetGrowth`: Year-over-year change in total assets
-- `NetShareIssuance`: Year-over-year change in shares outstanding
+The following variables are taken from the stock fundamentals:
 
-### 2.3 Feature Scaling
+- Book-to-Market (`B/M`):  captures valuation relative to book value and is a canonical factor in asset pricing and cross-sectional models. $B/M=\frac{Equity}{Price\times Shares}$
+- Return on Equity (`ROE`):  measures profitability to equity holders and proxies the profitability factor component in five-factor frameworks. $ROE=\frac{Net Income_{TTM}}{Equity}$
+- Return on Assets (`ROA`):  complements ROE by controlling for capital structure and overall asset base. $ROA=\frac{Net Income_{TTM}}{Assets}$
+- `Net Margin`: gauges earnings efficiency and is routinely used in fundamental screens and profitability diagnostics.  $Net Margin=\frac{Net Income_{TTM}}{Revenues_{TTM}}$
+- `Leverage`:  captures balance-sheet risk and interacts with profitability and value in expected return models. $Leverage=\frac{Liabilities}{Assets}$
+- `Asset Growth` (Investment):  maps to the investment factor where higher investment has been associated with lower average returns. $Inv=\frac{Assets_{t}-Assets_{t-4q}}{Assets_{t-4q}}$
+- `Net Share Issuance`:  tracks dilution/buybacks and has documented predictive power for subsequent returns. $Issuance=\frac{Shares_{t}-Shares_{t-4q}}{Shares_{t-4q}}$
+- Size (`marketCap`):  provides a standard size control that stabilizes cross-sectional comparisons. $\log(Market Cap)=\log(Price\times Shares) $
+
+ This set targets value, profitability, investment, leverage, size, and dilution, which align with widely used multi-factor models and documented cross-sectional return predictors.
+
+#### Combination of both features:
+- `LogMktCap`: log(price × shares outstanding)
+***
+
+
+ ### Feature Scaling
 All features standardized using `StandardScaler` (fit on training set only)
 
 ---
 
-## 3. Target Variable
+## Target Variable
 
-### 3.1 Definition
+ ### Definition
 Binary classification: Will each stock beat SPY over next 12 months?
 
 ```bash
@@ -74,15 +288,15 @@ y = 1 if forward_return_stock > forward_return_spy else 0
 ```
 
 
-### 3.2 Label Distribution
+ ### Label Distribution
 - Approximately 50/50 split (by construction)
 - Varies by regime (bear markets: <50% beat SPY)
 
 ---
 
-## 4. Time Series Cross-Validation
+## Time Series Cross-Validation
 
-### 4.1 Strategy
+ ### Strategy
 Expanding window to prevent lookahead bias:
 
 ```bash
@@ -92,21 +306,21 @@ Fold 3: Train [2010-2021] → Test [2021-2025]
 ```
 
 
-### 4.2 Critical Safeguards
+ ### Critical Safeguards
 - No data leakage: features computed using only past data
 - Forward returns computed at prediction time (never look ahead)
 - Scaler fit on training set only, then applied to test
 - No shuffling (maintains temporal order)
 
-### 4.3 Evaluation Metrics
+ ### Evaluation Metrics
 - **Primary:** AUC (area under ROC curve)
 - **Secondary:** Sharpe ratio, alpha, drawdown from portfolio backtest
 
 ---
 
-## 5. Model Architecture
+## Model Architecture
 
-### 5.1 Base Model: Random Forest
+ ### Base Model: Random Forest
 
 ```bash
 RandomForestClassifier(
@@ -131,7 +345,7 @@ random_state=42 # Reproducibility
 - Shallow trees (3) generalize better
 - Reduces training-test gap from 12pp to 7pp
 
-### 5.2 Calibration: Isotonic Regression
+ ### Calibration: Isotonic Regression
 
 ```bash
 CalibratedClassifierCV(
@@ -159,15 +373,15 @@ cv=3 # Internal cross-validation
 
 ---
 
-## 6. Portfolio Construction
+## Portfolio Construction
 
-### 6.1 Signal Generation
+ ### Signal Generation
 For each stock on each month:
 1. Generate probability p(beat SPY)
 2. Apply 3-month rolling average (smoothing)
 3. Rank stocks by smoothed probability
 
-### 6.2 Position Assignment
+ ### Position Assignment
 - **Long:** Top 10% (highest probabilities)
 - **Short:** Bottom 10% (lowest probabilities)
 - **Neutral:** Middle 80%
@@ -177,28 +391,28 @@ Typical portfolio:
 - ~33 short positions
 - ~66 total positions
 
-### 6.3 Weighting
+ ### Weighting
 Equal-weighted within long and short buckets:
 - Each long position: 1/33 of long capital
 - Each short position: 1/33 of short capital
 - Total exposure: 100% long, 100% short (dollar-neutral)
 
-### 6.4 Rebalancing
+ ### Rebalancing
 - **Frequency:** Monthly (last trading day)
 - **Turnover:** ~42% average
 - **Transaction cost:** 10 bps per trade (0.1%)
 
 ---
 
-## 7. Performance Attribution
+## Performance Attribution
 
-### 7.1 Risk-Adjusted Returns
+ ### Risk-Adjusted Returns
 - **Sharpe Ratio:** 0.80
   - Calculation: (Annual Return - Risk Free) / Annual Volatility
   - Risk-free rate: 0% (for simplicity)
   - Annualization: √12 for monthly data
 
-### 7.2 Alpha Calculation
+ ### Alpha Calculation
 Linear regression: `Portfolio_Return = α + β × SPY_Return + ε`
 
 Results:
@@ -206,7 +420,7 @@ Results:
 - **Alpha:** 2.29% annual (0.191% monthly × 12)
 - **R²:** 0.859 (high correlation with market)
 
-### 7.3 Statistical Significance
+ ### Statistical Significance
 **Sharpe Ratio T-test:**
 - T-statistic: 6.53
 - P-value: <0.001
@@ -215,33 +429,33 @@ Results:
 
 ---
 
-## 8. Risk Management
+## Risk Management
 
-### 8.1 Drawdown Analysis
+ ### Drawdown Analysis
 - **Max Drawdown:** -21.5%
 - **Comparison:** SPY -24.0% (same period)
 - **Recovery time:** [calculate from data]
 
-### 8.2 Regime Analysis
+ ### Regime Analysis
 | Period | Portfolio DD | SPY DD | Difference |
 |--------|--------------|--------|------------|
 | COVID (2020) | -21.5% | -24.0% | +2.5% better |
 | Bear (2022) | -20.5% | -24.0% | +3.5% better |
 
-### 8.3 Position Limits
+ ### Position Limits
 - Max 10% in any single stock (naturally enforced by equal-weighting)
 - Sector concentration: Monitor but not explicitly constrained
 
 ---
 
-## 9. Transaction Cost Modeling
+## Transaction Cost Modeling
 
-### 9.1 Cost Assumptions
+ ### Cost Assumptions
 - **Bid-ask spread:** 5 bps (0.05%)
 - **Market impact:** 5 bps (0.05%)
 - **Total cost per trade:** 10 bps (0.1%)
 
-### 9.2 Annual Drag Calculation
+ ### Annual Drag Calculation
 
 ```
 Annual turnover = 42% monthly × 12 = 504% annual
@@ -250,26 +464,26 @@ Dollar-neutral: 2 × 0.50% = 1.0% drag
 Actual measured: 0.82% (from diagnostics)
 ```
 
-### 9.3 Net Alpha
+ ### Net Alpha
 - Gross alpha: ~3.0% (from IC)
 - Transaction costs: -0.82%
 - **Net alpha: 2.18%** ✅
 
 ---
 
-## 10. Production Considerations
+## Production Considerations
 
-### 10.1 Data Latency
+ ### Data Latency
 - Fundamental data: Quarterly lag (up to 45 days after quarter-end)
 - Price data: Daily (1-day lag acceptable)
 - Rebalancing: End of month (flexibility in exact timing)
 
-### 10.2 Execution
+ ### Execution
 - Portfolio construction: <1 minute (Python script)
 - Order generation: Equal-weighted positions
 - Execution window: Last day of month (spread over multiple hours)
 
-### 10.3 Monitoring
+ ### Monitoring
 - Track prediction distribution (mean ~0.50)
 - Monitor turnover (alert if >60%)
 - Check sector concentration (alert if any >30%)
@@ -277,46 +491,68 @@ Actual measured: 0.82% (from diagnostics)
 
 ---
 
-## 11. Known Limitations
+## Known Limitations
 
-### 11.1 Survivorship Bias
+ ### Survivorship Bias
 - Using current S&P 500 constituents may introduce bias
 - Mitigation: Historical constituent data would improve accuracy
 
-### 11.2 Market Impact
+ ### Market Impact
 - Large AUM would increase transaction costs beyond 10 bps
 - Strategy works best for <$100M AUM
 
-### 11.3 Regime Dependency
+ ### Regime Dependency
 - Strategy may underperform in:
   - Extreme momentum markets (2020-2021 tech rally)
   - Market dislocations (2008 crisis not in training data)
 
-### 11.4 Factor Crowding
+ ### Factor Crowding
 - Heavy reliance on size factor (37% of importance)
 - Size premium has weakened in recent years
 - Risk: If many strategies use similar factors, alpha erodes
 
 ---
 
-## 12. Future Improvements
+## Future Improvements
 
-### 12.1 Feature Engineering
+### Historical Fundamentals Extension:
+- **Goal:** Extend fundamental data before 2010
+- **Challenge:** SEC EDGAR API only available from 2010+
+- **Approach:** Commercial data providers (Compustat, Bloomberg) or manual parsing of historical filings
+- **Expected Impact:** More training data, potentially stronger signals in earlier regimes
+
+### Alternative Data Sources:
+- **Sentiment Analysis:** News headlines, social media, analyst reports
+- **Implementation:** NLP on earnings call transcripts, Twitter sentiment
+- **Expected Impact:** +0.02-0.03 Sharpe from behavioral signals
+- **Risk:** Sentiment data expensive, noisy, potential overfitting
+
+###  International Markets:
+- **Extend to:** European stocks (STOXX 600), Asian markets (Nikkei, HSI)
+- **Challenge:** Different accounting standards, data availability
+- **Benefit:** Test if signals generalize across regions
+- **Implementation:** Country-specific models or unified multi-region approach
+
+### Feature Engineering
 - Add sentiment features (news, social media)
 - Include sector-relative features (demean within industry)
 - Test alternative fundamental ratios
 
-### 12.2 Portfolio Construction
+### Portfolio Construction
 - Test different percentiles (top/bottom 5%, 15%)
 - Explore dynamic weighting (by conviction/probability)
 - Add sector neutralization
 
-### 12.3 Modeling
+### Modeling
 - Test alternative models (LightGBM, XGBoost)
 - Explore deep learning (LSTM for time series)
 - Multi-horizon predictions (1M, 3M, 6M, 12M)
 
-### 12.4 Risk Management
+### Risk Management
 - Implement max sector exposure limits
 - Add volatility targeting (scale positions by risk)
 - Dynamic rebalancing (respond to market volatility)
+
+
+<br><hr>
+[Back to top](#technical-methodology)
