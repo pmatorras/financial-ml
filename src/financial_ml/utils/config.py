@@ -50,7 +50,7 @@ FUNDA_KEYS  = [
     'LogMktCap'
     ]
 
-DEBUG_SYMBOLS = ['MRK']# 'CSX'] #['DTE', 'AEP']
+DEBUG_SYMBOLS = ['BRK.B', 'BLK']# 'CSX'] #['DTE', 'AEP']
 
 CANONICAL_CONCEPTS = {
     "CommonStockSharesOutstanding": [

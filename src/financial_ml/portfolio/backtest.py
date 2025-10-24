@@ -11,7 +11,7 @@ from financial_ml.portfolio.performance import aggregate_portfolio_return, inclu
 from financial_ml.portfolio.visualization import draw_cumulative_drawdown
 from financial_ml.portfolio.construction import construct_portfolio, smooth_predictions
 
-def run_backtest(args, per_top=10, per_bot=10):
+def run_backtest(args, per_top=90, per_bot=10):
     """
     Execute complete portfolio backtesting pipeline with diagnostics and visualization.
     
@@ -109,7 +109,7 @@ def run_backtest(args, per_top=10, per_bot=10):
     analyze_sector_concentration(df, pred_col) 
 
     # Calculate Portfolio Returns
-    portfolio_returns = df.groupby('date').apply(aggregate_portfolio_return, include_groups=False).reset_index()
+    portfolio_returns = df.groupby('date').apply(aggregate_portfolio_return,  portfolio_type=args.type, include_groups=False).reset_index()
     portfolio_returns.columns = ['date', 'portfolio_return']
 
     # Cumulative returns
@@ -139,7 +139,7 @@ def run_backtest(args, per_top=10, per_bot=10):
 
 
     print("=" * 60)
-    print("PORTFOLIO PERFORMANCE METRICS")
+    print(f"PORTFOLIO PERFORMANCE METRICS {args.type}")
     print("=" * 60)
     print(f"Sharpe Ratio:        {sharpe_ratio:.2f}")
     print(f"Max Drawdown:        {max_drawdown:.1%}")
@@ -149,4 +149,4 @@ def run_backtest(args, per_top=10, per_bot=10):
     print(f"Total Return:        {(portfolio_returns['cum_return'].iloc[-1] - 1):.1%}")
     print("=" * 60)
 
-    draw_cumulative_drawdown(portfolio_returns=portfolio_returns, spy=spy, drawdown=drawdown, max_drawdown=max_drawdown, model=model)
+    draw_cumulative_drawdown(portfolio_returns=portfolio_returns, spy=spy, drawdown=drawdown, max_drawdown=max_drawdown, model=model, portfolio_type=args.type)

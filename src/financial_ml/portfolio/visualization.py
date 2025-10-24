@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from financial_ml.utils.config import FIGURE_DIR
 from financial_ml.models import get_model_name
 
-def draw_cumulative_drawdown(portfolio_returns,spy, drawdown, max_drawdown, model):
+def draw_cumulative_drawdown(portfolio_returns,spy, drawdown, max_drawdown, model, portfolio_type):
     """
     Create 2-panel chart: cumulative returns and drawdown.
     
@@ -42,7 +42,7 @@ def draw_cumulative_drawdown(portfolio_returns,spy, drawdown, max_drawdown, mode
     axes[1].grid(alpha=0.3)
 
     plt.tight_layout()
-    figname = FIGURE_DIR / f"portfolio_backtest_{model}.png"
+    figname = FIGURE_DIR / f"portfolio_backtest_{model}_{portfolio_type}.png"
     plt.savefig(figname, dpi=300, bbox_inches='tight')
     #plt.show()
 

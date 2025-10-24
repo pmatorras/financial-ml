@@ -19,13 +19,12 @@ def cli():
     p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
 
     p_train = sub.add_parser("train", help="Train models")
-    p_train.add_argument('--use-enhanced', action='store_true',
-                   help='Include enhanced features (ranks, interactions, reversal)')
+    p_train.add_argument('--use-enhanced', action='store_true', help='Include enhanced features (ranks, interactions, reversal)')
 
     p_anal = sub.add_parser("analyze", help="Analize models")
 
     p_portfolio = sub.add_parser("portfolio", help="Create portfolio")
-
+    p_portfolio.add_argument('--type', help="which type of portfolio to build", type=str, default='100long', choices= ["100long", "longshort", "130-30"])
 
     #ensure --test --debug can go anywhere
     for sp in (p_info, p_funda, p_anal, p_train, p_portfolio):
@@ -58,6 +57,6 @@ def main(argv=None):
         print("Analyzing models")
         analyze_models(args)
     elif args.cmd == "portfolio":
-        print("Getting portfolio")
+        print(f"Getting a {args.type} type portfolio")
         run_backtest(args)
     return 0

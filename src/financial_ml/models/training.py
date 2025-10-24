@@ -102,7 +102,7 @@ def train(args):
     y_long = y.stack().rename("y")
     df = feat_long.join(y_long, how="inner")
     print(f"before first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
-    df = df.dropna()
+    #df = df.dropna()
     print(f"After first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
     require_non_empty(df, "feat_join_ylong")
 

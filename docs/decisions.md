@@ -164,6 +164,58 @@ df['y_prob_smooth'] = df.groupby('ticker')['y_prob'].rolling(3, min_periods=1).m
 
 ---
 
+## 6. Portfolio Strategy: 100% Long-Only
+
+### Decision: Use 100% long-only strategy (NOT long-short or 130-30)
+
+### Why Long-Only Over Long-Short?
+
+❌ **Long-short failed**:
+- Spread between top and bottom 10%: only 0.09%/month
+- Annual return: 0.54% (essentially zero)
+- Problem: Both long and short picks have high correlation (0.95)
+- Both groups ride the market up together
+
+✅ **Long-only works**:
+- Annual return: 17.9%
+- Sharpe ratio: 0.80
+- Alpha: 2.29% (statistically significant)
+- Beta: 1.01 (market-neutral exposure)
+
+### Why Not 130-30?
+
+**Tested 130-30 Strategy**:
+- Annual return: 18.3% (+0.4% vs long-only)
+- Sharpe ratio: 0.80 (identical)
+- Max drawdown: -20.9% (marginally better)
+
+**Conclusion**: Not worth the added complexity, real-world costs eliminate any edge:
+- Short borrow fees: 0.5-2% annually
+- Higher rebalancing frequency
+- Short recall risk
+- Margin requirements
+
+### Root Cause Analysis
+
+**Model captures market exposure, not cross-sectional alpha**:
+- Top 10% outperform market by 0.2%/month
+- Bottom 10% also underperforms market by 0.07%/month
+- Correlation between longs and shorts: 0.95
+
+**What this means**:
+- Model is good at identifying stocks with positive beta
+- Model is weak at differentiating winners from losers
+- Alpha comes from market participation + modest selection edge
+
+### Final Strategy
+
+100% long-only with top 10% holdings:
+- Captures market beta (~15.5% annual)
+- Adds selection alpha (~2.3% annual)
+- Total: 17.9% annual with Sharpe 0.80
+
+
+
 ## Summary: Key Principles
 
 Throughout this project, design decisions followed these principles:

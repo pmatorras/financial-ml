@@ -4,20 +4,21 @@ Calculate portfolio performance and metrics.
 
 import pandas as pd
 
-def aggregate_portfolio_return(group, type='100long'):
+def aggregate_portfolio_return(group, portfolio_type='100long'):
     '''
     Calculate portfolio average return, for a single period by aggregatting positions.
     Args:
         group: 
-        type: type of portfolio that one wants to follow
+        portfolio_type: portfolio_type of portfolio that one wants to follow
     Returns:
         df with the portfolio returns
     '''
     long_ret = group[group['position'] == 1]['return'].mean()
     short_ret = group[group['position'] == -1]['return'].mean()
-    if type=='100long':
+
+    if portfolio_type=='100long':
         portfolio_ret = long_ret if pd.notna(long_ret) else 0
-    elif type =='longshort':
+    elif portfolio_type =='longshort':
         # Dollar-neutral: 50% long, 50% short
         if pd.notna(long_ret) and pd.notna(short_ret):
             portfolio_ret = 0.5 * long_ret + 0.5 * (-short_ret)
@@ -27,10 +28,19 @@ def aggregate_portfolio_return(group, type='100long'):
             portfolio_ret = 0.5 * (-short_ret)  # Only short positions
         else:
             portfolio_ret = 0    
+    elif portfolio_type == '130-30':
+        # 130% long, 30% short, net 100% exposure
+        if pd.notna(long_ret) and pd.notna(short_ret):
+            portfolio_ret = 1.3 * long_ret - 0.3 * short_ret
+        elif pd.notna(long_ret):
+            portfolio_ret = 1.3 * long_ret  # Only long available
+        elif pd.notna(short_ret):
+            portfolio_ret = -0.3 * short_ret  # Only short available
+        else:
+            portfolio_ret = 0
     else:
-        print(f"option {type} not implemented")
+        print(f"option {portfolio_type} not implemented")
         exit()
-    
     return portfolio_ret
 
 

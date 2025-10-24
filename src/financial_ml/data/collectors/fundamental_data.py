@@ -228,7 +228,7 @@ def _compute_liabilities_from_balance_sheet(cf_json):
 
 
 
-def resolve_concept2(cf_json, canonical_key, args, compare=False, merge=False):
+def resolve_concept(cf_json, canonical_key, args, compare=False, merge=False):
     candidates = CANONICAL_CONCEPTS.get(canonical_key, [])
     found = []
     
@@ -414,9 +414,8 @@ def fetch_facts_latest_for_cik(cik, ticker, dict_facts,args):
         needs_merge = canon_key in ["Revenues", "CommonStockSharesOutstanding", "NetIncomeLoss"]
         needs_compare = canon_key == "CommonStockSharesOutstanding"
         if args.debug: print("pre concept", canon_key)
-        df_k = resolve_concept2(cf, canon_key,args, compare=needs_compare, merge=needs_merge)
+        df_k = resolve_concept(cf, canon_key,args, compare=needs_compare, merge=needs_merge)
 
-        #df_k = resolve_concept(cf, canon_key, compare=(canon_key == "SharesOutstanding"))
         if not df_k.empty:
             # resolve_concept already sets the canonical_key column
             series.append(df_k)
