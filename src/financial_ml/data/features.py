@@ -83,7 +83,7 @@ def calculate_market_features(prices,args):
     Calculate technical market features from prices.
     
     Args:
-        prices: DataFrame with stock prices (wide format: dates × tickers)
+        prices: DataFrame with stock prices (wide format: dates x tickers)
         
     Returns:
         dict: {feature_name: DataFrame} for each market feature
@@ -173,6 +173,8 @@ def compute_fundamental_ratios(feat_long, args):
         bad = ~np.isfinite(mcap) | (mcap <= 0)
         n_shares.to_csv(DEBUG_DIR/"nshares.csv") 
         revenues.to_csv(DEBUG_DIR/'revenues.csv')
+        net_income.to_csv(DEBUG_DIR/'netIncome.csv')
+
         print("nonpositive_or_missing:", bad.sum())           # count of bad inputs
         print(mcap[bad].head())                                # spot-check values
         mcap.to_csv(DEBUG_DIR/"marketcap.csv")

@@ -74,7 +74,6 @@ def train(args):
     if not args.only_market:
         compute_fundamental_ratios(feat_long, args)
 
-    # ===== ADD ENHANCED FEATURES HERE =====
     if hasattr(args, 'use_enhanced') and args.use_enhanced:
         print("\n=== CALCULATING ENHANCED FEATURES ===")
         
@@ -97,7 +96,6 @@ def train(args):
             if key not in input_keys:
                 input_keys.append(key)
 
-    # ===== END ENHANCED FEATURES =====
     #Add the Y to the datafrane
     y_long = y.stack().rename("y")
     df = feat_long.join(y_long, how="inner")

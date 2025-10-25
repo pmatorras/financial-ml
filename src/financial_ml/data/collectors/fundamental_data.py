@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from financial_ml.utils.config import SP500_NAMES_FILE, CANONICAL_CONCEPTS
+from financial_ml.utils.config import SP500_NAMES_FILE, CANONICAL_CONCEPTS, CIK_OVERRIDES
 from financial_ml.utils.paths import get_fundamental_file
 from financial_ml.data.collectors.utils import filter_market_subset
 
@@ -225,10 +225,147 @@ def _compute_liabilities_from_balance_sheet(cf_json):
         "source_tag": "Liabilities (from Assets-Equity)",
     })
 
-
-
-
 def resolve_concept(cf_json, canonical_key, args, compare=False, merge=False):
+    candidates = CANONICAL_CONCEPTS.get(canonical_key, [])
+    found = []
+    
+    for tax, tag, unit in candidates:
+        df = extract_tag_pit(cf_json, tax, tag, unit)
+        if not df.empty:
+            found.append((tax, tag, unit, df))
+
+    if not found:
+        return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+    
+    if args.debug: print("canon", canonical_key)
+    
+    # Special case: CommonStockSharesOutstanding
+    if canonical_key == "CommonStockSharesOutstanding":
+        # Try to find class-specific shares
+        classA_df = next((d for t,g,u,d in found if "ClassA" in g), None)
+        classB_df = next((d for t,g,u,d in found if "ClassB" in g), None)
+        
+        # If both classes exist, sum them
+        if classA_df is not None and classB_df is not None:
+            merged = pd.merge(
+                classA_df, classB_df,
+                on=["period_end", "filed"], 
+                how="outer",
+                suffixes=("_A", "_B")
+            )
+            merged["value_A"] = merged["value_A"].fillna(0)
+            merged["value_B"] = merged["value_B"].fillna(0)
+            
+            out = pd.DataFrame({
+                "period_end": merged["period_end"],
+                "filed": merged["filed"],
+                "value": merged["value_A"] + merged["value_B"],
+                "metric": "CommonStockSharesOutstanding",
+                "unit": "shares",
+                "source_taxonomy": "us-gaap",
+                "source_tag": "CommonStockSharesOutstanding (Class A + B)",
+                "canonical_key": canonical_key
+            })
+            
+            # Fill gaps with non-class tags
+            existing_dates = set(out['period_end'])
+            for t, g, u, df in found:
+                if 'ClassA' not in g and 'ClassB' not in g:
+                    new_data = df[~df['period_end'].isin(existing_dates)].copy()
+                    if not new_data.empty:
+                        new_data['canonical_key'] = canonical_key
+                        out = pd.concat([out, new_data], ignore_index=True)
+            
+            return out.sort_values('period_end').reset_index(drop=True)
+        
+        # Priority order (FIXED - WeightedAverage before Entity)
+        priority_tags = [
+            "CommonStockSharesOutstanding",
+            "CommonStockSharesIssued",
+            "WeightedAverageNumberOfSharesOutstandingBasic",  # ← MOVED UP
+            "EntityCommonStockSharesOutstanding"  # ← MOVED DOWN
+        ]
+        
+        # Collect ALL available tags
+        tag_dfs = {}
+        for priority_tag in priority_tags:
+            match = next((df for t, g, u, df in found if g == priority_tag), None)
+            if match is not None:
+                tag_dfs[priority_tag] = match.copy()
+        
+        if not tag_dfs:
+            return pd.DataFrame(columns=["period_end","filed","value","metric","unit"])
+        
+        # Start with highest priority available tag
+        first_tag = next((t for t in priority_tags if t in tag_dfs), None)
+        out = tag_dfs[first_tag].copy()
+        
+        # Fill gaps with ALL remaining tags
+        existing_dates = set(out['period_end'])
+        for priority_tag in priority_tags:
+            if priority_tag == first_tag:
+                continue  # Skip the one we started with
+            
+            if priority_tag in tag_dfs:
+                new_data = tag_dfs[priority_tag][~tag_dfs[priority_tag]['period_end'].isin(existing_dates)].copy()
+                if not new_data.empty:
+                    out = pd.concat([out, new_data], ignore_index=True)
+                    existing_dates.update(new_data['period_end'])
+                    
+        out['canonical_key'] = canonical_key
+        return out.sort_values('period_end').reset_index(drop=True)
+    
+    # [Keep your Liabilities logic unchanged]
+    if canonical_key == "Liabilities":
+        # ... your existing code ...
+        pass
+    
+    # Merge logic for other concepts
+    if merge and len(found) > 1:
+        all_dfs = [df.copy() for _, _, _, df in found]
+        combined = pd.concat(all_dfs, ignore_index=True)
+        
+        combined = combined.sort_values(
+            ["period_end", "filed"], 
+            ascending=[True, False]
+        ).drop_duplicates(
+            subset=["period_end"], 
+            keep="first"
+        ).sort_values("period_end")
+        
+        combined["metric"] = canonical_key
+        combined["canonical_key"] = canonical_key
+        
+        if compare:
+            us_df = next((df for t, _, _, df in found if t == "us-gaap"), None)
+            dei_df = next((df for t, _, _, df in found if t == "dei"), None)
+            
+            if us_df is not None and dei_df is not None:
+                uval = us_df.sort_values(["filed","period_end"]).iloc[-1]["value"]
+                dval = dei_df.sort_values(["filed","period_end"]).iloc[-1]["value"]
+                ratio = max(uval, dval) / min(uval, dval) if min(uval, dval) else float("inf")
+                if ratio > 100:
+                    print("Warning: DQC_0095-like scale mismatch for shares.")
+        
+        return combined
+    
+    # Default: return first found, but TRY TO FILL GAPS
+    out = found[0][3].copy()
+    existing_dates = set(out['period_end'])
+    
+    for _, _, _, df in found[1:]:
+        new_data = df[~df['period_end'].isin(existing_dates)].copy()
+        if not new_data.empty:
+            out = pd.concat([out, new_data], ignore_index=True)
+            existing_dates.update(new_data['period_end'])
+    
+    out["canonical_key"] = canonical_key
+    return out.sort_values('period_end').reset_index(drop=True)
+
+
+
+
+def resolve_concept2(cf_json, canonical_key, args, compare=False, merge=False):
     candidates = CANONICAL_CONCEPTS.get(canonical_key, [])
     found = []
     
@@ -277,7 +414,8 @@ def resolve_concept(cf_json, canonical_key, args, compare=False, merge=False):
         priority_tags = [
             "CommonStockSharesOutstanding",      # Primary
             "CommonStockSharesIssued",           # Fallback 1
-            "EntityCommonStockSharesOutstanding" # Fallback 2 (dei)
+            "WeightedAverageNumberOfSharesOutstandingBasic",  # Fallback 2
+            "EntityCommonStockSharesOutstanding" # Fallback 3 (dei)
         ]
         
         # Collect dataframes for each priority tag
@@ -292,6 +430,8 @@ def resolve_concept(cf_json, canonical_key, args, compare=False, merge=False):
             out = tag_dfs["CommonStockSharesOutstanding"].copy()
         elif "CommonStockSharesIssued" in tag_dfs:
             out = tag_dfs["CommonStockSharesIssued"].copy()
+        elif 'WeightedAverageNumberOfSharesOutstandingBasic' in tag_dfs:
+            out = tag_dfs['WeightedAverageNumberOfSharesOutstandingBasic'].copy()
         elif "EntityCommonStockSharesOutstanding" in tag_dfs:
             out = tag_dfs["EntityCommonStockSharesOutstanding"].copy()
         else:
@@ -309,7 +449,6 @@ def resolve_concept(cf_json, canonical_key, args, compare=False, merge=False):
                     
         out['canonical_key'] = canonical_key
         return out.sort_values('period_end').reset_index(drop=True)
-    
     if canonical_key == "Liabilities":
             total_df = next((d for t,g,u,d in found if g=="Liabilities"), None)
             current_df = next((d for t,g,u,d in found if g=="LiabilitiesCurrent"), None)
@@ -401,7 +540,64 @@ def resolve_concept(cf_json, canonical_key, args, compare=False, merge=False):
     out["canonical_key"] = canonical_key
     return out
 
-def fetch_facts_latest_for_cik(cik, ticker, dict_facts,args):
+
+
+
+def fetch_facts_latest_for_cik(cik, ticker, dict_facts, args):
+    """
+    Retrieve facts for one company, with automatic fallback to alternate CIKs.
+    """
+    # Check if this ticker has multiple CIKs
+    if ticker in CIK_OVERRIDES:
+        cik_list = CIK_OVERRIDES[ticker]
+    else:
+        cik_list = [cik]
+    
+    all_series = []
+    
+    for try_cik in cik_list:
+        try:
+            cf = get_json(f"{BASE}/api/xbrl/companyfacts/CIK{try_cik}.json")
+            
+            requested_keys = list(dict_facts.keys())
+            
+            for canon_key in requested_keys:
+                needs_merge = canon_key in ["Revenues", "CommonStockSharesOutstanding", "NetIncomeLoss"]
+                needs_compare = canon_key == "CommonStockSharesOutstanding"
+                
+                if args.debug:
+                    print(f"  pre concept: {canon_key} from CIK {try_cik}")
+                
+                dfk = resolve_concept(cf, canon_key, args, compare=needs_compare, merge=needs_merge)
+                
+                if not dfk.empty:
+                    dfk['source_cik'] = try_cik
+                    dfk['canonicalkey'] = canon_key  # ADD THIS LINE
+                    all_series.append(dfk)
+        
+        except Exception as e:
+            if args.debug:
+                print(f"  CIK {try_cik} failed: {e}")
+            continue
+    
+    if not all_series:
+        # Return empty DataFrame
+        cols = ['period_end','filed','value','metric','unit','sourcetaxonomy','sourcetag','canonicalkey']
+        return pd.DataFrame(columns=cols + ['cik', 'ticker'])
+    
+    # Combine data from all CIKs
+    facts_long = pd.concat(all_series, ignore_index=True)
+    
+    # NOW drop duplicates - canonicalkey exists
+    facts_latest = dropDuplicateInfo(facts_long, ['canonicalkey','unit','period_end','filed'])
+    
+    facts_latest['cik'] = ','.join(cik_list)
+    facts_latest['ticker'] = ticker
+    
+    return facts_latest
+
+    
+def fetch_facts_latest_for_cik_old(cik, ticker, dict_facts,args):
     """
     Retrieve facts for one company, resolving to canonical_key for all requested concepts.
     """

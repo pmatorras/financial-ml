@@ -50,7 +50,16 @@ FUNDA_KEYS  = [
     'LogMktCap'
     ]
 
-DEBUG_SYMBOLS = ['BRK.B', 'BLK']# 'CSX'] #['DTE', 'AEP']
+DEBUG_SYMBOLS = ['DPZ'] #'BRK.B', # 'CSX'] #['DTE', 'AEP']
+UNFIXABLE = ['V']
+more =['DPZ', 'ERIE', 'GS', 'PCAR', 'PSKY', 'STZ', 'SYF', 'TFC', 'TKO', 'TSN']
+# Add at top of file
+CIK_OVERRIDES = {
+    'BLK': ['0001364742', '0002012383'],  # Old CIK first for historical data
+    'APA': ['0000006769', '0001841666'],  # Apache Corp (old) → APA Corp (new, March 2021)
+
+    # Add more as needed
+}
 
 CANONICAL_CONCEPTS = {
     "CommonStockSharesOutstanding": [
@@ -62,6 +71,7 @@ CANONICAL_CONCEPTS = {
         ("us-gaap", "CommonClassBMember", "shares"),
         ("us-gaap", "CommonStockClassASharesOutstanding", "shares"),
         ("us-gaap", "CommonStockClassBSharesOutstanding", "shares"),
+        ("us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic", "shares"), 
     ],
     "Assets": [("us-gaap", "Assets", "USD")],
     "Liabilities": [
@@ -77,6 +87,7 @@ CANONICAL_CONCEPTS = {
         ("us-gaap", "Revenues", "USD"),
         ("us-gaap", "SalesRevenueNet", "USD"),  
         ("us-gaap", "RegulatedOperatingRevenue", "USD"),
+        ("us-gaap", "RevenuesNetOfInterestExpense", "USD"), 
         ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
         ("us-gaap","RevenueFromContractWithCustomerIncludingAssessedTax","USD")
     ],

@@ -11,7 +11,7 @@ from financial_ml.portfolio.performance import aggregate_portfolio_return, inclu
 from financial_ml.portfolio.visualization import draw_cumulative_drawdown
 from financial_ml.portfolio.construction import construct_portfolio, smooth_predictions
 
-def run_backtest(args, per_top=90, per_bot=10):
+def run_backtest(args, per_top=10, per_bot=10):
     """
     Execute complete portfolio backtesting pipeline with diagnostics and visualization.
     

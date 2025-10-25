@@ -25,6 +25,8 @@ def cli():
 
     p_portfolio = sub.add_parser("portfolio", help="Create portfolio")
     p_portfolio.add_argument('--type', help="which type of portfolio to build", type=str, default='100long', choices= ["100long", "longshort", "130-30"])
+    p_portfolio.add_argument('--pertop', help="Percentage top portfolio used", type=float, default=10)
+    p_portfolio.add_argument('--perbot', help="Percentage bottom portfolio used", type=float, default=10)
 
     #ensure --test --debug can go anywhere
     for sp in (p_info, p_funda, p_anal, p_train, p_portfolio):
@@ -58,5 +60,5 @@ def main(argv=None):
         analyze_models(args)
     elif args.cmd == "portfolio":
         print(f"Getting a {args.type} type portfolio")
-        run_backtest(args)
+        run_backtest(args, args.pertop, args.perbot)
     return 0
