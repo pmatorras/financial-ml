@@ -160,8 +160,8 @@ def compute_fundamental_ratios(feat_long, args):
     assets = feat_long["Assets"].astype(float)
     liabilities = feat_long["Liabilities"].astype(float)
     equity = feat_long["StockholdersEquity"].astype(float)
-    net_income = feat_long["NetIncomeLoss"]
-    revenues = feat_long["Revenues"]
+    net_income = feat_long["NetIncomeLoss"].astype(float)
+    revenues = feat_long["Revenues"].astype(float)
 
     #Market cap and size
     market_cap = price * n_shares
@@ -174,6 +174,7 @@ def compute_fundamental_ratios(feat_long, args):
         n_shares.to_csv(DEBUG_DIR/"nshares.csv") 
         revenues.to_csv(DEBUG_DIR/'revenues.csv')
         net_income.to_csv(DEBUG_DIR/'netIncome.csv')
+        equity.to_csv(DEBUG_DIR/'equity.csv')
 
         print("nonpositive_or_missing:", bad.sum())           # count of bad inputs
         print(mcap[bad].head())                                # spot-check values
@@ -208,6 +209,7 @@ def compute_fundamental_ratios(feat_long, args):
     inv_qe = inv_qe.replace([np.inf, -np.inf], np.nan)
     iss_qe = iss_qe.replace([np.inf, -np.inf], np.nan)
     if args.debug:
+        avg_equity.to_csv(DEBUG_DIR/'avg_eq.csv')
         print(feat_long.keys(), feat_long["ROE"])
         check = pd.DataFrame({'Date': dates, 'BQ_Rollback': bq_roll, 'Is_BQ_End': is_bqe, }).set_index('Date')
         check.to_csv(DEBUG_DIR/"check_dates.csv", mode='w')

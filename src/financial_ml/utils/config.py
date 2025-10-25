@@ -51,8 +51,8 @@ FUNDA_KEYS  = [
     ]
 
 DEBUG_SYMBOLS = ['DPZ'] #'BRK.B', # 'CSX'] #['DTE', 'AEP']
-UNFIXABLE = ['V']
-more =['DPZ', 'ERIE', 'GS', 'PCAR', 'PSKY', 'STZ', 'SYF', 'TFC', 'TKO', 'TSN']
+UNFIXABLE = ['V', 'ERIE']
+more =['PCAR', 'PSKY', 'STZ', 'SYF', 'TFC', 'TKO', 'TSN']
 # Add at top of file
 CIK_OVERRIDES = {
     'BLK': ['0001364742', '0002012383'],  # Old CIK first for historical data

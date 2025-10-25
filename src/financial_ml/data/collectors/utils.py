@@ -8,8 +8,12 @@ def filter_market_subset(df, args):
     Returns a skimmed df
     '''
     if args.debug:
-        print(f"returning the following symbols :{DEBUG_SYMBOLS}")
-        return(df[df['Symbol'].isin(DEBUG_SYMBOLS)])
+        if args.ticker:
+            debug_symbols=args.ticker
+        else:
+            debug_symbols = DEBUG_SYMBOLS
+        print(f"returning the following symbols :{debug_symbols}")
+        return(df[df['Symbol'].isin(debug_symbols)])
     elif args.test: 
         print("returning only test subset")
         return df.sort_values('Date added').head(50)

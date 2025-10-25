@@ -4,6 +4,12 @@ from financial_ml.models import train
 from financial_ml.utils.paths import createFolders
 from financial_ml.portfolio import run_backtest
 from financial_ml.evaluation.analyze import analyze_models
+
+def list_from_string(s):
+    """Parses a comma-separated string into a list and removes whitespace."""
+    return [item.strip() for item in s.split(',')]
+
+
 def cli():
     parser = argparse.ArgumentParser(prog="financial_ml",
                                      description="S&P 500 data pipeline: fetch, fundamentals, train")
@@ -34,6 +40,7 @@ def cli():
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
         sp.add_argument("--only-market", dest="only_market",
                          help="Explicitly don't include fundamentals in training features", action="store_true")
+        sp.add_argument("--ticker", help="chose ml to display", type=list_from_string, default=None)
         sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb"])
 
     return parser
