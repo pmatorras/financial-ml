@@ -51,9 +51,8 @@ FUNDA_KEYS  = [
     ]
 
 DEBUG_SYMBOLS = ['DPZ'] #'BRK.B', # 'CSX'] #['DTE', 'AEP']
-UNFIXABLE = ['V', 'ERIE']
-more =['PCAR', 'PSKY', 'STZ', 'SYF', 'TFC', 'TKO', 'TSN']
-# Add at top of file
+UNFIXABLE = ['ERIE', 'PSKY', 'STZ', 'TKO', 'V'] #Check issues page (https://github.com/pmatorras/financial-ml/issues) for more info
+
 CIK_OVERRIDES = {
     'BLK': ['0001364742', '0002012383'],  # Old CIK first for historical data
     'APA': ['0000006769', '0001841666'],  # Apache Corp (old) → APA Corp (new, March 2021)
@@ -63,6 +62,8 @@ CIK_OVERRIDES = {
 
 CANONICAL_CONCEPTS = {
     "CommonStockSharesOutstanding": [
+        ("us-gaap", "WeightedAverageNumberOfDilutedSharesOutstanding", "shares"),
+        ("us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic", "shares"), 
         ("us-gaap", "CommonStockSharesOutstanding", "shares"),
         ("us-gaap", "CommonStockSharesIssued", "shares"),
         ("dei", "EntityCommonStockSharesOutstanding", "shares"),
@@ -71,7 +72,6 @@ CANONICAL_CONCEPTS = {
         ("us-gaap", "CommonClassBMember", "shares"),
         ("us-gaap", "CommonStockClassASharesOutstanding", "shares"),
         ("us-gaap", "CommonStockClassBSharesOutstanding", "shares"),
-        ("us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic", "shares"), 
     ],
     "Assets": [("us-gaap", "Assets", "USD")],
     "Liabilities": [
@@ -84,12 +84,21 @@ CANONICAL_CONCEPTS = {
         ("us-gaap", "StockholdersEquity", "USD")
     ],
     "Revenues": [
+        # General/agregate
         ("us-gaap", "Revenues", "USD"),
         ("us-gaap", "SalesRevenueNet", "USD"),  
         ("us-gaap", "RegulatedOperatingRevenue", "USD"),
         ("us-gaap", "RevenuesNetOfInterestExpense", "USD"), 
+        # Post 2018 (ASC 606)
         ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
-        ("us-gaap","RevenueFromContractWithCustomerIncludingAssessedTax","USD")
+        ("us-gaap","RevenueFromContractWithCustomerIncludingAssessedTax","USD"),
+        # For financial institutions
+        ("us-gaap", "InterestAndFeeIncomeLoansAndLeases", "USD"),  # Financial services
+        ("us-gaap", "InterestIncomeOperating", "USD"),  # Banks/lenders
+        # Pre-2018 (specific/narrow) - use as last resort
+        ("us-gaap", "SalesRevenueGoodsNet", "USD"),  # Goods only (may miss service revenue)
+        ("us-gaap", "SalesRevenueServicesNet", "USD"),  # Services only (may miss goods revenue)
+     
     ],
     "NetIncomeLoss": [
         ("us-gaap", "NetIncomeLossAvailableToCommonStockholdersBasic", "USD"),

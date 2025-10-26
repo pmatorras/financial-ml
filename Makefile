@@ -23,11 +23,25 @@ fundamentals-debug:
 train-debug:
 	python -m financial_ml train -d
 
-train-all:
+# Full  test pipeline with debug mode
+test: market-debug fundamentals-debug train-debug
+
+#Full deployment
+market:
+	python -m financial_ml market
+
+fundamentals:
+	python -m financial_ml fundamentals
+
+train:
 	python -m financial_ml train 
 
-# Full  test pipeline
-test-ticker: market-debug fundamentals-debug train-debug
+analyze:
+	python -m financial_ml  analyze
+
+portfolio:
+	python -m financial_ml  portfolio
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
