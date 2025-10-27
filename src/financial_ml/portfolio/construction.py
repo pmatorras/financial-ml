@@ -18,6 +18,7 @@ def construct_portfolio(df, per_top=10, per_bot=10, pred_col='y_prob'):
         
         df.loc[mask & (df[pred_col] >= top), 'position'] = 1
         df.loc[mask & (df[pred_col] <= bottom), 'position'] = -1
+
     return df
 
 def smooth_predictions(df, window=3):

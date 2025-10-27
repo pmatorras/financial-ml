@@ -28,6 +28,5 @@ def main(argv=None):
         analyze_models(args)
     elif args.cmd == "portfolio":
         print(f"Getting a {args.type} type portfolio")
-        exit()
         run_backtest(args, args.pertop, args.perbot)
     return 0

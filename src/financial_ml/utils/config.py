@@ -52,7 +52,6 @@ FUNDA_KEYS  = [
 
 DEBUG_SYMBOLS = ['DPZ'] #'BRK.B', # 'CSX'] #['DTE', 'AEP']
 UNFIXABLE = ['ERIE', 'PSKY', 'STZ', 'TKO', 'V'] #Check issues page (https://github.com/pmatorras/financial-ml/issues) for more info
-
 CIK_OVERRIDES = {
     'BLK': ['0001364742', '0002012383'],  # Old CIK first for historical data
     'APA': ['0000006769', '0001841666'],  # Apache Corp (old) → APA Corp (new, March 2021)

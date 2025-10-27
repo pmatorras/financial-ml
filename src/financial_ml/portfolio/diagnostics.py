@@ -419,3 +419,61 @@ def test_sharpe_significance(portfolio_returns, sharpe_ratio):
     print(f"  Adjusted threshold: p < {bonf_thresh:.4f}")
     print(f"  Result: {'✅ PASSES' if p_raw < bonf_thresh else '❌ FAILS'} multiple testing")
 
+
+def test_random_baseline(df, per_top=10, per_bot=10, pred_col='y_prob', portfolio_type='100long'):
+    """
+    Test if alpha comes from model or equal-weighting.
+    
+    Returns dict with metrics AND the random portfolio for plotting.
+    """
+    import numpy as np
+    from financial_ml.portfolio.construction import construct_portfolio
+    from financial_ml.portfolio.performance import aggregate_portfolio_return
+    
+    print("\n" + "="*60)
+    print("RANDOM BASELINE TEST - Model Validation")
+    print("="*60)
+    
+    # Save original predictions
+    df = df.copy()
+    df['y_prob_original'] = df[pred_col].copy()
+    
+    # Test with random predictions
+    np.random.seed(42)
+    df[pred_col] = np.random.uniform(
+        df['y_prob_original'].min(), 
+        df['y_prob_original'].max(), 
+        len(df)
+    )
+    
+    print("\nTesting random predictions...")
+    df_random_portfolio = construct_portfolio(df, per_top, per_bot, pred_col=pred_col)
+    #perf_random = aggregate_portfolio_return(df_random_portfolio)
+    perf_random = df_random_portfolio.groupby('date').apply(aggregate_portfolio_return,  portfolio_type=portfolio_type, include_groups=False).reset_index()
+    perf_random_mean = perf_random['return'].mean() if 'return' in perf_random.columns else perf_random[0].mean()
+
+    # Restore original predictions
+    df[pred_col] = df['y_prob_original']
+    
+    print("Testing real model predictions...")
+    df_real_portfolio = construct_portfolio(df, per_top, per_bot, pred_col=pred_col)
+    #perf_real = aggregate_portfolio_return(df_real_portfolio)
+    perf_real = df_real_portfolio.groupby('date').apply(aggregate_portfolio_return,  portfolio_type=portfolio_type, include_groups=False).reset_index()
+    perf_real_mean = perf_real['return'].mean() if 'return' in perf_real.columns else perf_real[0].mean()
+
+    print("\n" + "="*60)
+    print("COMPARISON")
+    print("="*60)
+    print(f"Random:  {perf_random_mean:.6f}")
+    print(f"Real:    {perf_real_mean:.6f}")
+    print(f"Delta:   {perf_real_mean - perf_random_mean:.6f}")
+    print(f"\n   Annualized:")
+    print(f"Random:  {perf_random_mean * 12 * 100:.2f}%")
+    print(f"Real:    {perf_real_mean * 12 * 100:.2f}%")
+    print(f"Alpha:   {(perf_real_mean - perf_random_mean) * 12 * 100:.2f}%")
+    print("="*60)
+    
+    perf_random.columns = ['date', 'portfolio_return']
+
+    # Return both metrics and the random portfolio data for plotting
+    return perf_random

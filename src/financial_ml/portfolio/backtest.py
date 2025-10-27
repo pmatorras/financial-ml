@@ -6,9 +6,9 @@ import pandas as pd
 import numpy as np
 from financial_ml.utils.paths import get_market_file, get_prediction_file
 from financial_ml.models import get_models
-from financial_ml.portfolio.diagnostics import print_model_agreement, compare_model_performance_by_period, analyze_prediction_stability, analyze_turnover, analyze_sector_concentration, analyze_beta_exposure, compare_drawdowns_to_spy, test_sharpe_significance
+from financial_ml.portfolio.diagnostics import print_model_agreement, compare_model_performance_by_period, analyze_prediction_stability, analyze_turnover, analyze_sector_concentration, analyze_beta_exposure, compare_drawdowns_to_spy, test_sharpe_significance, test_random_baseline
 from financial_ml.portfolio.performance import aggregate_portfolio_return, include_benchmark_return
-from financial_ml.portfolio.visualization import draw_cumulative_drawdown
+from financial_ml.portfolio.visualization import draw_cumulative_drawdown,draw_cumulative_drawdown_all
 from financial_ml.portfolio.construction import construct_portfolio, smooth_predictions
 
 def run_backtest(args, per_top=10, per_bot=10):
@@ -134,12 +134,13 @@ def run_backtest(args, per_top=10, per_bot=10):
     # Win Rate
     win_rate = (portfolio_returns['portfolio_return'] > 0).sum() / len(portfolio_returns)
 
+    random_returns = test_random_baseline(df, per_top=10, per_bot=10, pred_col='y_prob_smooth', portfolio_type=args.type)  # Or y_prob_smooth if that's what you use
 
     test_sharpe_significance(portfolio_returns=portfolio_returns, sharpe_ratio=sharpe_ratio)
 
 
     print("=" * 60)
-    print(f"PORTFOLIO PERFORMANCE METRICS {args.type}")
+    print(f"PORTFOLIO PERFORMANCE METRICS ({model},{args.type}), top{round(per_top)}% stocks")
     print("=" * 60)
     print(f"Sharpe Ratio:        {sharpe_ratio:.2f}")
     print(f"Max Drawdown:        {max_drawdown:.1%}")
@@ -149,4 +150,15 @@ def run_backtest(args, per_top=10, per_bot=10):
     print(f"Total Return:        {(portfolio_returns['cum_return'].iloc[-1] - 1):.1%}")
     print("=" * 60)
 
-    draw_cumulative_drawdown(portfolio_returns=portfolio_returns, spy=spy, drawdown=drawdown, max_drawdown=max_drawdown, model=model, portfolio_type=args.type)
+    draw_cumulative_drawdown(portfolio_returns=portfolio_returns, spy=spy, drawdown=drawdown, max_drawdown=max_drawdown, model=model, portfolio_type=args.type,per_top=str(round(per_top)))
+
+    
+    df_equal = df.copy()
+    df_equal['position'] = 1  # Long everything equally
+    equal_weight_returns = df_equal.groupby('date').apply(aggregate_portfolio_return,  portfolio_type=args.type, include_groups=False).reset_index()
+    equal_weight_returns.columns =  ['date', 'portfolio_return'] 
+    print(type(equal_weight_returns), type(random_returns), type(portfolio_returns))
+    equal_weight_returns['cum_return'] = (1 + equal_weight_returns['portfolio_return']).cumprod()
+    random_returns['cum_return'] = (1 + random_returns['portfolio_return']).cumprod()
+    print(portfolio_returns, equal_weight_returns, random_returns)
+    draw_cumulative_drawdown_all(portfolio_returns=portfolio_returns, spy=spy, equal_weight_returns=equal_weight_returns, random_returns=random_returns, drawdown=drawdown, max_drawdown=max_drawdown, model=model, portfolio_type=args.type,per_top=str(round(per_top)))

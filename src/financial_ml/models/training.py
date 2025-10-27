@@ -148,7 +148,13 @@ def train(args):
             print(f"  Sample tickers: {sorted(df['ticker'].unique())[:20]}")
         print(f"DTE Leverage: {len(df[df['ticker']=='DTE'])} total, {df[df['ticker']=='DTE']['Leverage'].notna().sum()} non-null")
 
+    # Define features to exclude
+    exclude_features = ['ClosePrice', 'LogMktCap']
+
+    # Filter out excluded features
+    input_keys = [key for key in input_keys if key not in exclude_features]
     print("Input variables to train", input_keys)
+
     X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()
 
