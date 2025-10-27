@@ -17,7 +17,7 @@ def cli():
     p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
 
     p_train = sub.add_parser("train", help="Train models")
-    p_train.add_argument('--use-enhanced', action='store_true', help='Include enhanced features (ranks, interactions, reversal)')
+
 
     p_anal = sub.add_parser("analyze", help="Analize models")
 
@@ -31,7 +31,8 @@ def cli():
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
         sp.add_argument("--only-market", dest="only_market",
                          help="Explicitly don't include fundamentals in training features", action="store_true")
+        sp.add_argument('--use-enhanced', action='store_true', help='Include enhanced features (ranks, interactions, reversal)')
         sp.add_argument("--ticker", help="chose ml to display", type=list_from_string, default=None)
-        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb"])
+        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb", "ensemble"])
 
     return parser

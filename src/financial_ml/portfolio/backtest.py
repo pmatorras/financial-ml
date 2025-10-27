@@ -4,11 +4,11 @@ Portfolio backtesting orchestration.
 
 import pandas as pd
 import numpy as np
-from financial_ml.utils.paths import get_market_file, get_prediction_file
+from financial_ml.utils.paths import get_market_file, get_prediction_file, get_dir
 from financial_ml.models import get_models
 from financial_ml.portfolio.diagnostics import print_model_agreement, compare_model_performance_by_period, analyze_prediction_stability, analyze_turnover, analyze_sector_concentration, analyze_beta_exposure, compare_drawdowns_to_spy, test_sharpe_significance, test_random_baseline
 from financial_ml.portfolio.performance import aggregate_portfolio_return, include_benchmark_return
-from financial_ml.portfolio.visualization import draw_cumulative_drawdown_all,plot_sector_concentration_over_time
+from financial_ml.portfolio.visualization import plot_cumulative_drawdown_all,plot_sector_concentration_over_time
 from financial_ml.portfolio.construction import construct_portfolio, smooth_predictions
 
 def run_backtest(args, per_top=10, per_bot=10):
@@ -27,8 +27,7 @@ def run_backtest(args, per_top=10, per_bot=10):
     preds_nm = get_prediction_file(args)
     preds = pd.read_csv(preds_nm)
 
-    doEnsemble=False
-    if doEnsemble:
+    if 'ensemble' in args.model:
         # Create ensemble predictions by averaging LogReg_L2 + RF_cal
         logreg_preds = preds[preds['model'] == 'logreg_l2'][['date', 'ticker', 'y_prob', 'y_true']].copy()
         rf_preds = preds[preds['model'] == 'rf_cal'][['date', 'ticker', 'y_prob', 'y_true']].copy()
@@ -107,7 +106,9 @@ def run_backtest(args, per_top=10, per_bot=10):
     analyze_prediction_stability(df)
     turnover = analyze_turnover(df) #turnover analysis
     analyze_sector_concentration(df)
-    sector_drift = plot_sector_concentration_over_time(df)
+
+    fig_dir = get_dir(args, 'figure')
+    sector_drift = plot_sector_concentration_over_time(df, fig_dir=fig_dir)
     #analyze_sector_concentration_old(df, pred_col) 
 
     # Calculate Portfolio Returns
@@ -132,7 +133,7 @@ def run_backtest(args, per_top=10, per_bot=10):
 
 
 
-    beta, alpha = analyze_beta_exposure(portfolio_returns, equal_weight_returns, random_returns)
+    analyze_beta_exposure(portfolio_returns, equal_weight_returns, random_returns)
     compare_drawdowns_to_spy(portfolio_returns, equal_weight_returns, random_returns)
 
     # Sharpe Ratio (annualized)
@@ -166,4 +167,4 @@ def run_backtest(args, per_top=10, per_bot=10):
     print("=" * 60)
 
     #Plot cummulative gains and drawdowns
-    draw_cumulative_drawdown_all(portfolio_returns=portfolio_returns, spy=spy, equal_weight_returns=equal_weight_returns, random_returns=random_returns, drawdown=drawdown, max_drawdown=max_drawdown, model=model, portfolio_type=args.type,per_top=str(round(per_top)))
+    plot_cumulative_drawdown_all(portfolio_returns=portfolio_returns, spy=spy, equal_weight_returns=equal_weight_returns, random_returns=random_returns, drawdown=drawdown, max_drawdown=max_drawdown, model=model, portfolio_type=args.type,per_top=str(round(per_top)), fig_dir=fig_dir)

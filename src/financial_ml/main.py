@@ -2,7 +2,7 @@
 from financial_ml.cli.parser import cli
 from financial_ml.data.collectors import collect_market_data, collect_fundamentals
 from financial_ml.models import train
-from financial_ml.utils.paths import createFolders
+from financial_ml.utils.paths import create_parent_folders
 from financial_ml.portfolio import run_backtest
 from financial_ml.evaluation.analyze import analyze_models
 
@@ -11,7 +11,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     args.best_model = 'rf_cal'
     print(f"Running the code, with arguments: {args}")
-    createFolders()
+    create_parent_folders()
 
 
     if args.cmd == "market":

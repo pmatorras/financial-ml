@@ -23,7 +23,8 @@ from financial_ml.portfolio.performance import (
 
 # Visualization
 from financial_ml.portfolio.visualization import (
-    draw_cumulative_drawdown_all
+    plot_cumulative_drawdown_all,
+    plot_sector_concentration_over_time
 )
 
 # Diagnostics - import commonly used ones explicitly

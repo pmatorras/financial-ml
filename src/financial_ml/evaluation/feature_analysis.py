@@ -38,7 +38,7 @@ def plot_rf_feature_importance(model, feature_names, save_path=FIGURE_DIR / "fea
     plt.tight_layout()
 
     if save_path:
-        print("Saving file to:", save_path, FIGURE_DIR)
+        print("Saving figure to:", save_path)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
     
     return importance_df
@@ -94,7 +94,7 @@ def plot_logistic_coefficients(pipeline, feature_names, save_path=FIGURE_DIR / "
     
     return coef_df
 
-def analyze_feature_importance(models_dict, feature_names):
+def analyze_feature_importance(models_dict, feature_names, fig_dir=FIGURE_DIR):
     """
     Analyze feature importance across all trained models
     
@@ -132,7 +132,7 @@ def analyze_feature_importance(models_dict, feature_names):
             print(f"{'='*60}")
             importance_df = plot_rf_feature_importance(
                 model, feature_names, 
-                save_path=FIGURE_DIR/ f"importance_{model_name.lower()}.png"
+                save_path=fig_dir/ f"importance_{model_name.lower()}.png"
             )
             print(importance_df.sort_values('importance', ascending=False).to_string(index=False))
             
@@ -143,7 +143,7 @@ def analyze_feature_importance(models_dict, feature_names):
             print(f"{'='*60}")
             coef_df = plot_logistic_coefficients(
                 pipeline, feature_names,
-                save_path=FIGURE_DIR /f"coefficients_{model_name.lower()}.png"
+                save_path=fig_dir /f"coefficients_{model_name.lower()}.png"
             )
             print(coef_df.sort_values('abs_coefficient', ascending=False).to_string(index=False))
         else:

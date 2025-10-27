@@ -4,10 +4,10 @@ Portfolio visualization functions.
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from financial_ml.utils.config import FIGURE_DIR, SP500_NAMES_FILE
+from financial_ml.utils.config import FIGURE_DIR, SP500_NAMES_FILE, SEPARATOR_WIDTH
 from financial_ml.models import get_model_name
 
-def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FILE):
+def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FILE, fig_dir=FIGURE_DIR):
     """
     Plot how sector concentration changes over time.
     Shows if model has stable sector bias or is sector-timing.
@@ -55,16 +55,16 @@ def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FI
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=9)
     ax.grid(alpha=0.3, axis='y')
     ax.set_ylim(0, 100)
-    
     plt.tight_layout()
-    figname = FIGURE_DIR/ 'sector_drift_over_time.png'
+
+    figname = fig_dir/ 'sector_drift_over_time.png'
     plt.savefig(figname, dpi=300, bbox_inches='tight')
     print(f"\n✅ Saved sector drift chart: {figname}")
     
     # Summary statistics
-    print("\n" + "="*60)
+    print("\n" + "="* SEPARATOR_WIDTH)
     print("SECTOR STABILITY ANALYSIS")
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     
     # Calculate mean and std for each sector
     sector_stats = weights_pivot.describe().T[['mean', 'std', 'min', 'max']]
@@ -72,7 +72,7 @@ def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FI
     
     print("\nAverage Sector Weights Over Time:")
     print(f"{'Sector':<30} {'Mean':>8} {'Std':>8} {'Min':>8} {'Max':>8}")
-    print("-"*60)
+    print("-"* SEPARATOR_WIDTH)
     
     for sector in sector_stats.index:
         mean = sector_stats.loc[sector, 'mean']
@@ -87,12 +87,12 @@ def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FI
     print("\n💡 Interpretation:")
     print("  - Low Std = Stable sector preference (structural bias)")
     print("  - High Std = Sector timing attempts (may be luck)")
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     
     return weights_pivot
 
-def draw_cumulative_drawdown_all(portfolio_returns, spy, equal_weight_returns, random_returns,
-                            drawdown, max_drawdown, model, portfolio_type, per_top):
+def plot_cumulative_drawdown_all(portfolio_returns, spy, equal_weight_returns, random_returns,
+                            drawdown, max_drawdown, model, portfolio_type, per_top, fig_dir=FIGURE_DIR):
     """
     Create 2-panel chart with honest performance attribution.
     """
@@ -154,7 +154,7 @@ def draw_cumulative_drawdown_all(portfolio_returns, spy, equal_weight_returns, r
     axes[1].grid(alpha=0.3)
 
     plt.tight_layout()
-    figname = FIGURE_DIR / f"portfolio_backtest_{model}_{portfolio_type}_top{per_top}.png"
+    figname = fig_dir / f"portfolio_backtest_{model}_{portfolio_type}_top{per_top}.png"
     plt.savefig(figname, dpi=300, bbox_inches='tight')
     
     print(f"\nChart saved to {figname}")

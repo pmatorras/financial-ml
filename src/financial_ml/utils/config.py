@@ -23,10 +23,11 @@ SP500_FUNDA_FILE = DATA_DIR / "sp500_fundamentals.csv"
 SP500_FUNDA_TEST = DATA_DIR / "sp500_fundamentals_test.csv"
 SP500_FUNDA_DEBUG = DEBUG_DIR / "sp500_fundamentals_debug.csv"
 
-#Prediction files
-SP500_PRED_FILE = DATA_DIR / "sp500_oof_predictions.csv"
-SP500_PRED_TEST = DATA_DIR / "sp500_oof_predictions_test.csv"
-SP500_PRED_DEBUG = DEBUG_DIR / "sp500_oof_predictions_debug.csv"
+#number of folds
+N_SPLITS = 3
+
+#Display formatting constants
+SEPARATOR_WIDTH = 70
 
 
 DATA_INTERVAL="1mo"
