@@ -3,7 +3,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.calibration import CalibratedClassifierCV
 
 MODEL_METADATA = {
     "logreg_l1": {
@@ -74,15 +75,49 @@ def get_models():
             ("impute", SimpleImputer(strategy="median")),  # handle NaN
             ("scaler", "passthrough"),  # trees don"t need scaling
             ("clf", RandomForestClassifier(n_estimators=50, 
-                                           max_depth=4,
-                                           min_samples_split=0.01,
-                                           min_samples_leaf=0.005,
+                                           max_depth=3,
+                                           min_samples_split=0.02,
+                                           min_samples_leaf=0.01,
                                            max_features='log2',#'sqrt',
                                            random_state=42,
                                            n_jobs=-1, 
                                            class_weight="balanced"
 
                                         ))
+        ]),
+        "rf_cal": Pipeline([
+            ("sanitize", sanitize),                    # replace ±inf with NaN
+            ("impute", SimpleImputer(strategy="median")),  # handle NaN
+            ("scaler", "passthrough"),  # trees don"t need scaling
+            ("clf", CalibratedClassifierCV(
+                estimator=RandomForestClassifier(
+                    n_estimators=50,
+                    max_depth=3,
+                    min_samples_split=0.02,
+                    min_samples_leaf=0.01,
+                    max_features='log2',
+                    random_state=42,
+                    n_jobs=-1,
+                    class_weight="balanced"
+                ),
+                method='isotonic',
+                cv=3
+            ))
         ])
     }
     return models
+
+    '''
+    'gb': Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", GradientBoostingClassifier(
+            n_estimators=50,
+            max_depth=2,
+            learning_rate=0.01,
+            subsample=0.5,
+            validation_fraction=0.2,
+            n_iter_no_change=10,
+            random_state=42
+        ))
+    ])
+    '''

@@ -3,8 +3,9 @@ import numpy as np
 import joblib
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from financial_ml.utils.config import DEBUG_DIR, FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS
+from financial_ml.utils.config import DEBUG_DIR, FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS, N_SPLITS
 from financial_ml.utils.paths import get_prediction_file, get_model_file, get_features_file
+from financial_ml.utils.logging import save_training_summary
 from financial_ml.models.definitions import get_model_name, get_models
 from financial_ml.data import (
     require_non_empty,
@@ -17,7 +18,7 @@ from financial_ml.data import (
     widen_by_canonical
 ) 
 
-
+from financial_ml.data.features import calculate_enhanced_features
 
 
 
@@ -73,11 +74,34 @@ def train(args):
 
     if not args.only_market:
         compute_fundamental_ratios(feat_long, args)
+
+    if hasattr(args, 'use_enhanced') and args.use_enhanced:
+        print("\n=== CALCULATING ENHANCED FEATURES ===")
+        
+        feat_reset = feat_long.reset_index()
+        enhanced_dict = calculate_enhanced_features(feat_reset)
+        
+        # Features that will be replaced by their ranks
+        features_to_rank = ['BookToMarket', 'ROE', 'ROA', 'mom121', 'vol12', 'LogMktCap', 'r12']
+        
+        # Remove raw versions if we're adding ranked versions
+        for feat in features_to_rank:
+            rank_key = f'{feat}_rank'
+            if rank_key in enhanced_dict and feat in input_keys:
+                print(f"  Replacing {feat} with {rank_key}")
+                input_keys.remove(feat)  # Remove raw
+        
+        # Add enhanced features
+        for key, values in enhanced_dict.items():
+            feat_long[key] = values.values
+            if key not in input_keys:
+                input_keys.append(key)
+
     #Add the Y to the datafrane
     y_long = y.stack().rename("y")
     df = feat_long.join(y_long, how="inner")
     print(f"before first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
-    df = df.dropna()
+    #df = df.dropna()
     print(f"After first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
     require_non_empty(df, "feat_join_ylong")
 
@@ -125,7 +149,13 @@ def train(args):
             print(f"  Sample tickers: {sorted(df['ticker'].unique())[:20]}")
         print(f"DTE Leverage: {len(df[df['ticker']=='DTE'])} total, {df[df['ticker']=='DTE']['Leverage'].notna().sum()} non-null")
 
+    # Define features to exclude
+    exclude_features = ['ClosePrice', 'LogMktCap']
+
+    # Filter out excluded features
+    input_keys = [key for key in input_keys if key not in exclude_features]
     print("Input variables to train", input_keys)
+
     X = df[input_keys].to_numpy()
     Y = df["y"].to_numpy()
 
@@ -134,16 +164,20 @@ def train(args):
     X, Y = X[order], Y[order]
     unique_dates = np.array(sorted(df["date"].unique()))
 
-    tscv = TimeSeriesSplit(n_splits=3,test_size=36,gap=1)
+    tscv = TimeSeriesSplit(n_splits=N_SPLITS,test_size=36,gap=1)
 
     pred_rows = []
     models = get_models()
     trained_models = {}
+    fold_results = {}
     print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
-    for name, pipe in models.items():
+    models_to_run = models.items() if 'all' in args.model else [(args.model, models[args.model])]
+
+    for name, pipe in models_to_run:
         print(f"Training {get_model_name(name)}")
         aucs_test = []
         aucs_train = []
+        fold_results[name] = []
         for  split_id, (tr_d, te_d) in enumerate(tscv.split(unique_dates), 1):
             train_dates = set(unique_dates[tr_d])
             test_dates  = set(unique_dates[te_d])
@@ -161,7 +195,7 @@ def train(args):
                 print(f"[{name} | Fold {split_id}] "
                     f"Train {tr_start.date()} → {tr_end.date()} | "
                     f"Test {te_start.date()} → {te_end.date()} | "
-                    #f"Test class counts {dict(zip(classes, counts))}"
+                    f"Test class counts {dict(zip(classes, counts))}"
                     )
             print(f"[{name} | Fold {split_id}] "
                   f"Train {tr_start.date()} → {tr_end.date()} | "
@@ -170,8 +204,10 @@ def train(args):
             pipe.fit(Xtrain, Ytrain)
             p_train = pipe.predict_proba(Xtrain)[:,1]
             p_test = pipe.predict_proba(Xtest)[:,1]
-            aucs_train.append(roc_auc_score(Ytrain, p_train))
-            aucs_test.append(roc_auc_score(Ytest, p_test))
+            train_auc = roc_auc_score(Ytrain, p_train)
+            test_auc = roc_auc_score(Ytest, p_test)
+            aucs_train.append(train_auc)
+            aucs_test.append(test_auc)
             fold_df = df.loc[te_mask, ["date","ticker"]].copy()
             fold_df["y_true"] = Ytest
             fold_df["y_prob"] = p_test
@@ -179,18 +215,33 @@ def train(args):
             fold_df["fold"] = split_id
             fold_df["model"] = name
             pred_rows.append(fold_df)
+            
+            # Collect fold metadata
+            fold_info = {
+                'fold': split_id,
+                'train_start': tr_start.strftime('%Y-%m-%d'),
+                'train_end': tr_end.strftime('%Y-%m-%d'),
+                'test_start': te_start.strftime('%Y-%m-%d'),
+                'test_end': te_end.strftime('%Y-%m-%d'),
+                'train_auc': train_auc,
+                'test_auc': test_auc,
+                'train_samples': len(Ytrain),
+                'test_samples': len(Ytest),
+                'test_positive_rate': Ytest.mean()
+            }
+            fold_results[name].append(fold_info)
 
         trained_models[name] = pipe
-        print("Baseline logistic train AUC ("+name+"):", np.round(aucs_train, 3).tolist())
-        print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, 3).tolist())
+        print("Baseline logistic train AUC ("+name+"):", np.round(aucs_train, N_SPLITS).tolist())
+        print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, N_SPLITS).tolist())
 
     pred_df = pd.concat(pred_rows, ignore_index=True)
     predpath = get_prediction_file(args)
     pred_df.to_csv(predpath, index=False)
 
 
-    # Save trained models
-    
+    # Save trained models and information
+    save_training_summary(fold_results, input_keys, args)
     for model_name, model_pipeline in trained_models.items():
         models_path = get_model_file(args, model_name)
         joblib.dump(model_pipeline, models_path)
@@ -198,10 +249,5 @@ def train(args):
     feature_path = get_features_file(args)
     with open(feature_path, 'w') as f:
         f.write('\n'.join(input_keys))
-    '''
-    analyze_feature_importance(
-        models_dict=trained_models, # Dict with model names as keys, trained pipelines as values
-        feature_names=input_keys   # List like ['ClosePrice', 'r1', 'r12', 'mom121', ...]
-    )
-    '''
+
     

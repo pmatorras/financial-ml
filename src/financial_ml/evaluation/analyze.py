@@ -5,7 +5,7 @@ Load trained models and run feature importance analysis.
 
 import joblib
 from financial_ml.models import get_models
-from financial_ml.utils.paths import get_model_file, get_features_file
+from financial_ml.utils.paths import get_model_file, get_features_file, get_dir
 from financial_ml.evaluation.feature_analysis import analyze_feature_importance
 
 def analyze_models(args):
@@ -28,7 +28,7 @@ def analyze_models(args):
         model_path = get_model_file(args, model_name)
         if model_path.exists():
             trained_models[model_name] = joblib.load(model_path)
-            print(f"  ✓ Loaded {model_name}")
+            print(f"    Loaded {model_name}")
         else:
             print(f"  ⚠️  {model_name} not found")
     
@@ -51,11 +51,11 @@ def analyze_models(args):
     print("\n" + "="*60)
     print("FEATURE IMPORTANCE ANALYSIS")
     print("="*60)
-    
+    fig_dir = get_dir(args, 'figures')
     analyze_feature_importance(
         models_dict=trained_models,
-        feature_names=input_keys
+        feature_names=input_keys,
+        fig_dir=fig_dir
     )
     
-    print(f"\n✓ Analysis complete! Charts saved to figures/")
     return 0

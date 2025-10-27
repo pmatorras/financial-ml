@@ -2,12 +2,25 @@ import pandas as pd
 from financial_ml.utils.paths import get_market_file, get_fundamental_file
 from financial_ml.utils.config import DEBUG_DIR
 
+def normalize_ticker(ticker):
+    """
+    Normalize ticker symbols to handle different formats.
+    BRK-B (yfinance) -> BRK.B (SEC standard)
+    BRK.B (SEC) -> BRK.B (keep as is)
+    """
+    if pd.isna(ticker):
+        return ticker
+    return str(ticker).replace('-', '.')
+
+
 def load_market(args):
     csv_filenm =get_market_file(args)
     print("opening", csv_filenm)
     px_all = (pd.read_csv(csv_filenm, index_col=0, parse_dates=True)
                 .apply(pd.to_numeric, errors="coerce")
                 .sort_index())
+    # NORMALIZE TICKER COLUMN NAMES
+    px_all.columns = [normalize_ticker(col) for col in px_all.columns]
     if "SPY" in px_all.columns:
         spy = px_all["SPY"]
         px_m = px_all.drop(columns=["SPY"])
@@ -20,10 +33,18 @@ def load_market(args):
 
 def load_fundamentals(args, required_keys=None, keep_unmapped=False):
     csv_filenm = get_fundamental_file(args)
-    f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"])
+    dtype_spec = {
+        'cik': str,  # Force CIK to string
+        'source_cik': str,  # Force source_cik to string
+        'ticker': str,
+        'unit': str,
+        'metric': str,
+    }
+    f = pd.read_csv(csv_filenm, parse_dates=["period_end","filed"],  dtype=dtype_spec )
     f['period_end'] = pd.to_datetime(f['period_end'], errors='coerce')
     f['filed'] = pd.to_datetime(f['filed'], errors='coerce')
-
+    if 'ticker' in f.columns:
+        f['ticker'] = f['ticker'].apply(normalize_ticker)
     # If canonical_key already exists in CSV, use it directly
     if 'canonical_key' in f.columns:
         out = f[['ticker','period_end','filed','unit','canonical_key','value','metric']].copy()

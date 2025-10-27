@@ -23,10 +23,11 @@ SP500_FUNDA_FILE = DATA_DIR / "sp500_fundamentals.csv"
 SP500_FUNDA_TEST = DATA_DIR / "sp500_fundamentals_test.csv"
 SP500_FUNDA_DEBUG = DEBUG_DIR / "sp500_fundamentals_debug.csv"
 
-#Prediction files
-SP500_PRED_FILE = DATA_DIR / "sp500_oof_predictions.csv"
-SP500_PRED_TEST = DATA_DIR / "sp500_oof_predictions_test.csv"
-SP500_PRED_DEBUG = DEBUG_DIR / "sp500_oof_predictions_debug.csv"
+#number of folds
+N_SPLITS = 3
+
+#Display formatting constants
+SEPARATOR_WIDTH = 70
 
 
 DATA_INTERVAL="1mo"
@@ -50,10 +51,19 @@ FUNDA_KEYS  = [
     'LogMktCap'
     ]
 
-DEBUG_SYMBOLS = ['MRK']# 'CSX'] #['DTE', 'AEP']
+DEBUG_SYMBOLS = ['DPZ'] #'BRK.B', # 'CSX'] #['DTE', 'AEP']
+UNFIXABLE = ['ERIE', 'PSKY', 'STZ', 'TKO', 'V'] #Check issues page (https://github.com/pmatorras/financial-ml/issues) for more info
+CIK_OVERRIDES = {
+    'BLK': ['0001364742', '0002012383'],  # Old CIK first for historical data
+    'APA': ['0000006769', '0001841666'],  # Apache Corp (old) → APA Corp (new, March 2021)
+
+    # Add more as needed
+}
 
 CANONICAL_CONCEPTS = {
     "CommonStockSharesOutstanding": [
+        ("us-gaap", "WeightedAverageNumberOfDilutedSharesOutstanding", "shares"),
+        ("us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic", "shares"), 
         ("us-gaap", "CommonStockSharesOutstanding", "shares"),
         ("us-gaap", "CommonStockSharesIssued", "shares"),
         ("dei", "EntityCommonStockSharesOutstanding", "shares"),
@@ -74,11 +84,21 @@ CANONICAL_CONCEPTS = {
         ("us-gaap", "StockholdersEquity", "USD")
     ],
     "Revenues": [
+        # General/agregate
         ("us-gaap", "Revenues", "USD"),
         ("us-gaap", "SalesRevenueNet", "USD"),  
         ("us-gaap", "RegulatedOperatingRevenue", "USD"),
+        ("us-gaap", "RevenuesNetOfInterestExpense", "USD"), 
+        # Post 2018 (ASC 606)
         ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
-        ("us-gaap","RevenueFromContractWithCustomerIncludingAssessedTax","USD")
+        ("us-gaap","RevenueFromContractWithCustomerIncludingAssessedTax","USD"),
+        # For financial institutions
+        ("us-gaap", "InterestAndFeeIncomeLoansAndLeases", "USD"),  # Financial services
+        ("us-gaap", "InterestIncomeOperating", "USD"),  # Banks/lenders
+        # Pre-2018 (specific/narrow) - use as last resort
+        ("us-gaap", "SalesRevenueGoodsNet", "USD"),  # Goods only (may miss service revenue)
+        ("us-gaap", "SalesRevenueServicesNet", "USD"),  # Services only (may miss goods revenue)
+     
     ],
     "NetIncomeLoss": [
         ("us-gaap", "NetIncomeLossAvailableToCommonStockholdersBasic", "USD"),

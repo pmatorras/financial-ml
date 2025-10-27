@@ -15,7 +15,7 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from scipy.stats import spearmanr
 import itertools
-
+from financial_ml.utils.config import SP500_NAMES_FILE, SEPARATOR_WIDTH
 def pre_filter_diagnostics(df):
     '''Check for data leakage and duplicate predictions'''
     print("\n=== PRE-FILTER DIAGNOSTIC ===")
@@ -42,9 +42,9 @@ def pre_filter_diagnostics(df):
 def print_model_agreement(preds_df, models):
     """Print model agreement analysis results"""
     
-    print("\n" + "="*60)
+    print("\n" + "="* SEPARATOR_WIDTH)
     print("MODEL AGREEMENT ANALYSIS")
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     print("Purpose: High correlation proves all models capture the same")
     print("         fundamental signal (not random overfitting)")
     
@@ -72,7 +72,7 @@ def print_model_agreement(preds_df, models):
         print("     → High risk of overfitting")
         print("     → Results may not be robust")
     
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
 
 def model_agreement_correlations(preds_df, models_dict, print_results=True):
     # Compare predictions from all 3 models
@@ -112,7 +112,7 @@ def model_agreement_correlations(preds_df, models_dict, print_results=True):
         )
     }
 
-def compare_model_performance_by_period(preds_df, returns_df):
+def compare_model_performance_by_period(preds_df, returns_df, models):
     """Compare RF vs Logistic performance across time periods"""
     
     # Merge predictions with returns
@@ -129,16 +129,16 @@ def compare_model_performance_by_period(preds_df, returns_df):
     
     df['period'] = df['date'].apply(assign_period)
     
-    print("\n" + "="*60)
+    print("\n" + "="* SEPARATOR_WIDTH)
     print("MODEL PERFORMANCE BY PERIOD")
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     
     for period in ['Bull 2016-2019', 'Mixed 2019-2022', 'Recovery 2022-2025']:
         period_data = df[df['period'] == period]
         
         print(f"\n{period}:")
         
-        for model in ['logreg_l2', 'rf']:
+        for model in models:
             model_data = period_data[period_data['model'] == model]
             
             # Calculate AUC (prediction quality)
@@ -149,7 +149,7 @@ def compare_model_performance_by_period(preds_df, returns_df):
             
             print(f"  {model:12s}: AUC={auc:.3f}, IC={ic:.3f}")
     
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
 
 def analyze_prediction_stability(df):
     """
@@ -162,9 +162,9 @@ def analyze_prediction_stability(df):
     df['y_prob_prev'] = df.groupby('ticker')['y_prob'].shift(1)
     df['y_prob_change'] = (df['y_prob'] - df['y_prob_prev']).abs()
     
-    print("\n" + "="*60)
+    print("\n" + "="* SEPARATOR_WIDTH)
     print("PREDICTION STABILITY ANALYSIS")
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     print(f"\nMonth-to-Month Prediction Change:")
     print(f"  Mean:   {df['y_prob_change'].mean():.4f}")
     print(f"  Median: {df['y_prob_change'].median():.4f}")
@@ -181,7 +181,7 @@ def analyze_prediction_stability(df):
     else:
         print(f"  ✅ LOW volatility (stable predictions)")
     
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
 
 
 
@@ -191,9 +191,9 @@ def analyze_turnover(df):
     High turnover with IC=0.03 means transaction costs kill your alpha.
     """
     
-    print("\n" + "="*60)
+    print("\n" + "="* SEPARATOR_WIDTH)
     print("TURNOVER ANALYSIS")
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     
     # Get holdings each month
     dates = sorted(df['date'].unique())
@@ -245,27 +245,17 @@ def analyze_turnover(df):
     else:
         print(f"  ✅ Reasonable: Net alpha > 2%")
     
-    print("="*60)
+    print("="* SEPARATOR_WIDTH)
     
     return avg_turnover
 
-def analyze_beta_exposure(portfolio_returns):
-    """
-    Calculate your portfolio's beta to SPY.
-    Beta > 1.0 means you're just taking more market risk, not adding alpha.
-    """
+def calculate_alpha_beta(df_returns, benchmark_returns, benchmark_nm, message):
     from scipy.stats import linregress
-    
-    print("\n" + "="*60)
-    print("MARKET BETA ANALYSIS")
-    print("="*60)
-    
-    # Merge portfolio and SPY returns
-    
+
     # Regression: portfolio_return = alpha + beta * spy_return
     slope, intercept, r_value, p_value, std_err = linregress(
-        portfolio_returns['spy_return'], 
-        portfolio_returns['portfolio_return']
+        benchmark_returns,
+        df_returns
     )
     
     beta = slope
@@ -273,23 +263,21 @@ def analyze_beta_exposure(portfolio_returns):
     alpha_annual = alpha_monthly * 12
     r_squared = r_value ** 2
     
-    print(f"\nRegression Results:")
+    print(f"- ML model vs: {message}")
     print(f"  Beta:                {beta:.3f}")
     print(f"  Alpha (monthly):     {alpha_monthly:.3%}")
     print(f"  Alpha (annual):      {alpha_annual:.2%}")
     print(f"  R-squared:           {r_squared:.3f}")
     print(f"  P-value:             {p_value:.4f}")
-    
-    print(f"\nInterpretation:")
     if beta > 1.15:
-        print(f"  ❌ HIGH BETA: You're taking {(beta-1)*100:.0f}% more market risk than SPY")
+        print(f"  ❌ HIGH BETA: You're taking {(beta-1)*100:.0f}% more market risk than {benchmark_nm}")
         print(f"     → Most 'alpha' is actually beta (riskier stocks)")
     elif beta > 1.05:
-        print(f"  ⚠️  MODERATE BETA: Slightly riskier than SPY ({beta:.2f})")
+        print(f"  ⚠️  MODERATE BETA: Slightly riskier than {benchmark_nm} ({beta:.2f})")
     elif beta > 0.95:
-        print(f"  ✅ NEUTRAL BETA: Similar risk to SPY ({beta:.2f})")
+        print(f"  ✅ NEUTRAL BETA: Similar risk to {benchmark_nm} ({beta:.2f})")
     else:
-        print(f"  ✅ DEFENSIVE: Lower risk than SPY ({beta:.2f})")
+        print(f"  ✅ DEFENSIVE: Lower risk than {benchmark_nm} ({beta:.2f})")
     
     if alpha_annual > 0.02:
         print(f"  ✅ True alpha exists: {alpha_annual:.1%} annual")
@@ -297,89 +285,184 @@ def analyze_beta_exposure(portfolio_returns):
         print(f"  ⚠️  Weak alpha: {alpha_annual:.1%} annual")
     else:
         print(f"  ❌ No alpha: All returns from beta")
-    
-    print("="*60)
-    
-    return beta, alpha_annual
+    print("-"* SEPARATOR_WIDTH)
 
-def analyze_sector_concentration(df, pred_col='y_prob', latest_date=None):
+def analyze_beta_exposure(portfolio_returns, random_returns, equal_returns):
     """
-    Check if your top 10% is concentrated in specific sectors.
-    Need sector data - if you don't have it, use this workaround.
+    Calculate alpha and beta against multiple benchmarks to understand return sources.
+    
+    Three key comparisons:
+    1. vs SPY (Market Beta) - Are you just levered to the market?
+    2. vs Equal-Weight - Are you adding value vs passive equal-weighting?
+    3. vs Random - Is your model better than luck?
     """
+    from scipy.stats import linregress
+    
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print("ALPHA & BETA ANALYSIS - Return Attribution")
+    print("="* SEPARATOR_WIDTH)
+    
+    print(f"\nRegression Results:")
+    calculate_alpha_beta(portfolio_returns['portfolio_return'], portfolio_returns['spy_return'], "SPY", "SPY (Market Beta):")
+    calculate_alpha_beta(portfolio_returns['portfolio_return'], equal_returns['portfolio_return'], "Equal-Weight Benchmark" , " Equal-Weight Benchmark (Selection Alpha):")
+    calculate_alpha_beta(portfolio_returns['portfolio_return'], random_returns['portfolio_return'], "Random Selection", "Random Selection (Pure Model Alpha):")
+
+    
+
+def analyze_sector_concentration(df_portfolio, sector_file=SP500_NAMES_FILE, latest_date=None):
+    """
+    Analyze sector concentration in portfolio using existing GICS sector column.
+    
+    Args:
+        df_portfolio: Portfolio DataFrame (must have 'sector' or 'GICS_sector' column)
+        sector_file: CSV with ticker->sector mapping
+        latest_date: Date to analyze (default: most recent)
+    """
+    """
+    Analyze sector concentration by mapping tickers to sectors on-the-fly.
+    
+    Args:
+        df_portfolio: Portfolio DataFrame with ticker column
+        sector_file: CSV with ticker->sector mapping
+        latest_date: Date to analyze
+    """
+    # Load sector mapping
+    sectors = pd.read_csv(sector_file)
+    if 'Symbol' in sectors.columns:
+        sectors = sectors.rename(columns={'Symbol': 'ticker'})
     if latest_date is None:
-        latest_date = df['date'].max()
-    print( df[(df['date'] == latest_date)])
-
-    holdings = df[(df['date'] == latest_date) & (df['position'] == 1)]['ticker'].values
+        latest_date = df_portfolio['date'].max()
     
-    print("\n" + "="*60)
-    print("SECTOR CONCENTRATION CHECK")
-    print("="*60)
+    print(df_portfolio.columns, sectors.columns)
+    # Get holdings and merge with sector data
+    holdings = df_portfolio[df_portfolio['date'] == latest_date].copy()
+    holdings = holdings.merge(sectors[['ticker', 'GICS Sector']], on='ticker', how='left')
+    
+    # Now you have sector info!
+    long_holdings = holdings[holdings['position'] == 1]
+    
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print("SECTOR CONCENTRATION ANALYSIS")
+    print("="* SEPARATOR_WIDTH)
     print(f"Date: {latest_date.date()}")
-    print(f"Total holdings: {len(holdings)}")
-    print(f"\nTop 20 holdings:")
+    print(f"Long positions: {len(long_holdings)}")
     
-    top_20 = df[(df['date'] == latest_date) & (df['position'] == 1)].nlargest(20, pred_col)
-    print(top_20)
-    #exit()
-    for idx, row in top_20.iterrows():
-        print(f"  {row['ticker']:>6s}: {row[pred_col]:.3f}")
+    # Check for missing sectors
+    missing = long_holdings['GICS Sector'].isna().sum()
+    if missing > 0:
+        print(f"⚠️  Warning: {missing} stocks missing sector data")
     
-    print(f"\n⚠️  Manual check required:")
-    print(f"  Look up these tickers and check if they're mostly:")
-    print(f"  - Tech (AAPL, MSFT, NVDA, GOOGL, META, etc.)")
-    print(f"  - Finance (JPM, BAC, GS, MS, etc.)")
-    print(f"  - Healthcare (UNH, JNJ, PFE, etc.)")
-    print(f"  If >50% are one sector → concentration risk!")
+    # Sector breakdown
+    sector_counts = long_holdings['GICS Sector'].value_counts()
+    sector_pcts = (sector_counts / len(long_holdings) * 100).round(1)
     
-    print("="*60)
+    print("\nPortfolio Sector Breakdown:")
+    print("-"* SEPARATOR_WIDTH)
+    for sector, count in sector_counts.items():
+        pct = sector_pcts[sector]
+        bar = "█" * int(pct / 2)
+        print(f"  {sector:30} {count:3d} ({pct:5.1f}%) {bar}")
+    
+    # Concentration check
+    max_sector = sector_counts.index[0]
+    max_pct = sector_pcts.iloc[0]
+    
+    print("\n" + "="* SEPARATOR_WIDTH)
+    if max_pct > 40:
+        print(f"❌ HIGH CONCENTRATION: {max_pct:.1f}% in {max_sector}")
+    elif max_pct > 25:
+        print(f"⚠️  MODERATE CONCENTRATION: {max_pct:.1f}% in {max_sector}")
+    else:
+        print(f"✅ WELL DIVERSIFIED: Max {max_pct:.1f}% in {max_sector}")
+    
+    print("="* SEPARATOR_WIDTH)
+    
+    return holdings
 
-def compare_drawdowns_to_spy(portfolio_returns):
+
+def calculate_drawdowns(df_returns, key_nm='portfolio'):
+    ret_key = key_nm+'_return'
+    cum_key = key_nm+'_cum'
+    dd_key = key_nm+'_dd'
+    cum_ret = 'cum_return' if key_nm=='portfolio' else key_nm+'_cum_return'
+    df_returns[cum_key] = (1 + df_returns[ret_key]).cumprod()
+    df_returns[dd_key] = (df_returns[cum_ret] / df_returns[cum_ret].cummax()) - 1
+    worst_dd_date = df_returns.loc[df_returns[dd_key].idxmin()]
+    worst_dd = df_returns[dd_key].min()
+    #print(f"{df_returns[dd_key].min():.1%} on {worst_dd_date['date'].date()}")
+    # Check 2022 bear market specifically
+
+    covid_2020 = df_returns[(df_returns['date'] >= '2020-01-01') & (df_returns['date'] <= '2020-12-31')] #note the year is referring to the market behaviour on that year, not the virus
+    if len(covid_2020) > 0:
+        covid_2020_dd = covid_2020[dd_key].min()
+    else:
+        covid_2020_dd = None
+        
+    bear_2022 = df_returns[(df_returns['date'] >= '2022-01-01') & (df_returns['date'] <= '2022-12-31')]
+    if len(bear_2022) > 0:
+        bear_2022_dd = bear_2022[dd_key].min()
+    else:
+        bear_2022_dd = None
+
+    return {'worst_dd': worst_dd,
+            'worst_dd_date': worst_dd_date,
+            'covid_2020' : covid_2020_dd,
+            'bear_2022' : bear_2022_dd
+    }
+
+def compare_dd_values(portfolio_dds, comparison_dds, drawdown='bear_2022', comparison_name='SPY'):
+    if portfolio_dds[drawdown] < comparison_dds[drawdown] - 0.05:  # 5% worse
+        print(f"  ❌ You fell MORE than {comparison_name} (no downside protection)")
+    elif portfolio_dds[drawdown] < comparison_dds[drawdown]:
+        print(f"  ⚠️  Slightly worse than {comparison_name}")
+    else:
+        print(f"  ✅ Better downside protection than {comparison_name}")
+
+
+
+def compare_drawdowns_to_spy(portfolio_returns, equal_weights_portfolio, random_returns):
     """
     Compare your drawdowns to SPY during same periods.
     If you fall more than SPY, you don't have downside protection.
     """
     
-    print("\n" + "="*60)
-    print("DRAWDOWN COMPARISON TO SPY")
-    print("="*60)
-    
-    
-    # Calculate cumulative returns
-    portfolio_returns['port_cum'] = (1 + portfolio_returns['portfolio_return']).cumprod()
-    portfolio_returns['spy_cum'] = (1 + portfolio_returns['spy_return']).cumprod()
-    
-    # Calculate drawdowns
-    portfolio_returns['port_dd'] = (portfolio_returns['cum_return'] / portfolio_returns['cum_return'].cummax()) - 1
-    portfolio_returns['spy_dd'] = (portfolio_returns['spy_cum_return'] / portfolio_returns['spy_cum_return'].cummax()) - 1
-    
-    # Find worst drawdown periods
-    port_worst = portfolio_returns.loc[portfolio_returns['port_dd'].idxmin()]
-    spy_worst = portfolio_returns.loc[portfolio_returns['spy_dd'].idxmin()]
-    
-    print(f"\nWorst Drawdowns:")
-    print(f"  Your portfolio: {portfolio_returns['port_dd'].min():.1%} on {port_worst['date'].date()}")
-    print(f"  SPY:            {portfolio_returns['spy_dd'].min():.1%} on {spy_worst['date'].date()}")
-    
-    # Check 2022 bear market specifically
-    bear_2022 = portfolio_returns[(portfolio_returns['date'] >= '2022-01-01') & (portfolio_returns['date'] <= '2022-12-31')]
-    if len(bear_2022) > 0:
-        port_2022_dd = bear_2022['port_dd'].min()
-        spy_2022_dd = bear_2022['spy_dd'].min()
-        
-        print(f"\n2022 Bear Market:")
-        print(f"  Your portfolio: {port_2022_dd:.1%}")
-        print(f"  SPY:            {spy_2022_dd:.1%}")
-        
-        if port_2022_dd < spy_2022_dd - 0.05:  # 5% worse
-            print(f"  ❌ You fell MORE than SPY (no downside protection)")
-        elif port_2022_dd < spy_2022_dd:
-            print(f"  ⚠️  Slightly worse than SPY")
-        else:
-            print(f"  ✅ Better downside protection than SPY")
-    
-    print("="*60)
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print("DRAWDOWN COMPARISON")
+    print("="* SEPARATOR_WIDTH)
+
+    portfolio_dds = calculate_drawdowns(portfolio_returns, 'portfolio')
+    spy_dds = calculate_drawdowns(portfolio_returns, 'spy')
+    equal_dds = calculate_drawdowns(equal_weights_portfolio, 'portfolio')
+    random_dds = calculate_drawdowns(random_returns, 'portfolio')
+
+    print(f"  ML Strategy:         {portfolio_dds['worst_dd'].min():.1%} on {portfolio_dds['worst_dd_date']['date'].date()}")
+    print(f"  Equal-Weight (100%): {equal_dds['worst_dd'].min():.1%} on {equal_dds['worst_dd_date']['date'].date()}")
+    print(f"  Random Selection:    {random_dds['worst_dd'].min():.1%} on {random_dds['worst_dd_date']['date'].date()}")
+
+    print(f"  SPY:                 {spy_dds['worst_dd'].min():.1%} on {spy_dds['worst_dd_date']['date'].date()}")
+
+    print(f"\n2020 COVID Crash:")
+    print(f"  ML Strategy:         {portfolio_dds['covid_2020']:.1%}")
+    print(f"  Equal-Weight (100%): {equal_dds['covid_2020']:.1%}")
+    print(f"  Random Selection:    {random_dds['covid_2020']:.1%}")
+    print(f"  SPY:                 {spy_dds['covid_2020']:.1%}")
+    print("-"* SEPARATOR_WIDTH)
+
+    compare_dd_values(portfolio_dds, spy_dds, 'covid_2020', 'SPY')
+    compare_dd_values(portfolio_dds, equal_dds, 'covid_2020', 'Equal-Weight (100%)')
+    compare_dd_values(portfolio_dds, random_dds, 'covid_2020', 'Random Selection')
+
+    print(f"\n2022 Bear Market:")
+    print(f"  ML Strategy:         {portfolio_dds['bear_2022']:.1%}")
+    print(f"  Equal-Weight (100%): {equal_dds['bear_2022']:.1%}")
+    print(f"  Random Selection:    {random_dds['bear_2022']:.1%}")
+    print(f"  SPY:                 {spy_dds['bear_2022']:.1%}")
+
+    compare_dd_values(portfolio_dds, spy_dds, 'bear_2022', 'SPY')
+    compare_dd_values(portfolio_dds, equal_dds, 'bear_2022', 'Equal-Weight (100%)')
+    compare_dd_values(portfolio_dds, random_dds, 'bear_2022', 'Random Selection')
+
+    print("="* SEPARATOR_WIDTH)
 
 def test_sharpe_significance(portfolio_returns, sharpe_ratio):
     '''Check if the sharpe ratio is statistically significant, also applying bonferroni correction'''
@@ -412,3 +495,65 @@ def test_sharpe_significance(portfolio_returns, sharpe_ratio):
     print(f"  Adjusted threshold: p < {bonf_thresh:.4f}")
     print(f"  Result: {'✅ PASSES' if p_raw < bonf_thresh else '❌ FAILS'} multiple testing")
 
+
+def test_random_baseline(df, per_top=10, per_bot=10, pred_col='y_prob', portfolio_type='100long'):
+    """
+    Test if alpha comes from model or equal-weighting.
+    
+    Returns dict with metrics AND the random portfolio for plotting.
+    """
+    import numpy as np
+    from financial_ml.portfolio.construction import construct_portfolio
+    from financial_ml.portfolio.performance import aggregate_portfolio_return
+    
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print("RANDOM BASELINE TEST - Model Validation")
+    print("="* SEPARATOR_WIDTH)
+    
+    # Save original predictions
+    df = df.copy()
+    df['y_prob_original'] = df[pred_col].copy()
+    
+    # Test with random predictions
+    np.random.seed(42)
+    df[pred_col] = np.random.uniform(
+        df['y_prob_original'].min(), 
+        df['y_prob_original'].max(), 
+        len(df)
+    )
+    
+    print("\nTesting random predictions...")
+    df_random_portfolio = construct_portfolio(df, per_top, per_bot, pred_col=pred_col)
+    #perf_random = aggregate_portfolio_return(df_random_portfolio)
+    perf_random = df_random_portfolio.groupby('date').apply(aggregate_portfolio_return,  portfolio_type=portfolio_type, include_groups=False).reset_index()
+    perf_random_mean = perf_random['return'].mean() if 'return' in perf_random.columns else perf_random[0].mean()
+
+    # Restore original predictions
+    df[pred_col] = df['y_prob_original']
+    
+    print("Testing real model predictions...")
+    df_real_portfolio = construct_portfolio(df, per_top, per_bot, pred_col=pred_col)
+    #perf_real = aggregate_portfolio_return(df_real_portfolio)
+    perf_real = df_real_portfolio.groupby('date').apply(aggregate_portfolio_return,  portfolio_type=portfolio_type, include_groups=False).reset_index()
+    perf_real_mean = perf_real['return'].mean() if 'return' in perf_real.columns else perf_real[0].mean()
+
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print("COMPARISON")
+    print("="* SEPARATOR_WIDTH)
+    print(f"Random:  {perf_random_mean:.6f}")
+    print(f"Real:    {perf_real_mean:.6f}")
+    print(f"Delta:   {perf_real_mean - perf_random_mean:.6f}")
+    print(f"\n   Annualized:")
+    print(f"Random:  {perf_random_mean * 12 * 100:.2f}%")
+    print(f"Real:    {perf_real_mean * 12 * 100:.2f}%")
+    print(f"Alpha:   {(perf_real_mean - perf_random_mean) * 12 * 100:.2f}%")
+    if (perf_real_mean - perf_random_mean) * 12 * 100 < 0.5:
+        print("❌ Model not better than random")
+    else:
+        print("✅ Model shows genuine skill")
+    print("="* SEPARATOR_WIDTH)
+    
+    perf_random.columns = ['date', 'portfolio_return']
+
+    # Return both metrics and the random portfolio data for plotting
+    return perf_random

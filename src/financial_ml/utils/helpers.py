@@ -8,5 +8,5 @@ def safe_div(numer, denom):
     numer = pd.to_numeric(numer, errors="coerce")
     denom = pd.to_numeric(denom, errors="coerce")
     out = numer / denom
-    return out.where((denom > 0) & np.isfinite(out))
+    return out.where((denom != 0) & np.isfinite(out))
 

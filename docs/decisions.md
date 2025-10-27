@@ -1,0 +1,229 @@
+# Design Decisions and Rationale
+
+This document explains the reasoning behind key design choices in the project.
+
+
+## Table of Contents
+
+- [1. Model Choice: Random Forest (Calibrated)](#1-model-choice-random-forest-calibrated)
+- [2. Ensemble: Rejected](#2-ensemble-rejected)
+- [3. Smoothing: 3-Month Window](#3-smoothing-3-month-window)
+- [4. Time Series CV: Expanding Window](#4-time-series-cv-expanding-window)
+- [5. Transaction Costs: 10 bps](#5-transaction-costs-10-bps)
+- [Summary: Key Principles](#summary-key-principles)
+---
+
+
+## 1. Model Choice: Random Forest (Calibrated)
+
+### Decision: Use calibrated Random Forest as final model
+
+### Why Random Forest Over Logistic Regression?
+1. **Better performance**
+    - RF test AUC: 0.557 vs LogReg 0.558 (similar)
+    - RF Sharpe: 0.71 vs LogReg ~0.65 (better)
+
+2. **Captures non-linearities**
+    - Stock returns are not linear in factors
+    - Interactions matter (e.g., value works differently in small vs large caps)
+
+3. **Robust to outliers**
+    - Tree-based models less sensitive to extreme values
+    - No need for extensive outlier treatment
+
+### Why Constrained (max_depth=3)?
+1. **Prevents overfitting**
+    - Deep trees: Test AUC drops to 0.52
+    - Shallow trees: Generalize better
+
+2. **Interpretability**
+    - Depth=3 means max 8 leaf nodes per tree
+    - Easier to understand decision boundaries
+
+### Why Calibration?
+1. **Fixed miscalibrated probabilities**
+    - Original: mean 0.487 (predicting only 5.7% beat SPY)
+    - Calibrated: mean 0.502 (proper interpretation)
+
+2. **Improved performance**
+    - Sharpe: 0.71 → 0.80 (+13%)
+    - Better discrimination (std 0.035 → 0.059)
+
+3. **Industry standard**
+    - Isotonic calibration is well-established
+    - Preserves ranking
+
+---
+
+## 2. Ensemble: Rejected
+
+### Decision: Do NOT use ensemble (LogReg + RF)
+
+### Why Not Ensemble?
+1. **Underperformed single model:**
+    - Ensemble Sharpe: 0.71 vs RF_cal 0.80 → Weaker model dragged down performance
+
+2. **Correlation too high (0.556)** → Models captured similar patterns
+
+
+### Key Learning:
+**Ensembles work when:**
+- Models have similar performance
+- Low correlation (<0.5)
+- Capture truly different patterns
+
+**Our case:**
+- RF_cal clearly superior
+- Moderate correlation (not enough diversity)
+
+**Conclusion: Use best single model**
+
+---
+
+## 3. Smoothing: 3-Month Window
+
+### Decision: Apply 3-month rolling average to predictions
+
+### Problem:
+Raw predictions were found to be volatile month-to-month (5.18% mean change)
+
+
+**→ Move to a 3-month window:** 
+
+### Rationale:
+1. **Reduces noise without losing signal**
+    - 58.7% reduction in volatility
+    - Sharpe maintained at 0.80
+
+2. **Lowers transaction costs**
+    - Turnover: 50% → 42%
+    - Cost drag: 1.0% → 0.82%
+
+3. **Smoother returns**
+    - Less month-to-month volatility  (1.93% mean change) in portfolio
+    - Better investor experience
+
+4. **Align the information to fundamentals**
+
+
+### Implementation:
+
+```bash
+df['y_prob_smooth'] = df.groupby('ticker')['y_prob'].rolling(3, min_periods=1).mean()
+
+```
+
+---
+
+## 4. Time Series CV: Expanding Window
+
+### Decision: Use expanding window (not sliding window)
+
+### Why Expanding?
+1. **Uses all available data**
+    - Later folds have more training data
+    - Better estimates as time progresses
+
+2. **More realistic**
+    - In production, you'd use all historical data
+    - Mimics actual deployment
+
+3. **Reduces variance**
+    - More training data → stabler models
+    - Fewer overfitting issues
+
+### Why Not Sliding Window?
+- Throws away old data
+- Smaller training sets
+- Less stable models over time
+
+---
+
+
+## 5. Transaction Costs: 10 bps
+
+### Decision: Model 10 bps (0.1%) per trade
+
+### Breakdown:
+- Bid-ask spread: 5 bps (realistic for liquid S&P 500 stocks)
+- Market impact: 5 bps (small orders, moderate liquidity)
+
+### Rationale:
+- **Conservative but realistic**
+    - S&P 500 stocks are liquid
+    - Institutional execution typically 5-15 bps
+
+- **Sensitive to AUM**
+    - Works for <$100M strategies
+    - Larger funds would face higher costs
+
+### Impact on Results:
+- Gross alpha: ~3.0%
+- Transaction costs: -0.82%
+- **Net alpha: 2.18%** (still attractive)
+
+---
+
+## 6. Portfolio Strategy: 100% Long-Only
+
+### Decision: Use 100% long-only strategy (NOT long-short or 130-30)
+
+### Why Long-Only Over Long-Short?
+
+❌ **Long-short failed**:
+- Spread between top and bottom 10%: only 0.09%/month
+- Annual return: 0.54% (essentially zero)
+- Problem: Both long and short picks have high correlation (0.95)
+- Both groups ride the market up together
+
+✅ **Long-only works**:
+- Annual return: 17.9%
+- Sharpe ratio: 0.80
+- Alpha: 2.29% (statistically significant)
+- Beta: 1.01 (market-neutral exposure)
+
+### Why Not 130-30?
+
+**Tested 130-30 Strategy**:
+- Annual return: 18.3% (+0.4% vs long-only)
+- Sharpe ratio: 0.80 (identical)
+- Max drawdown: -20.9% (marginally better)
+
+**Conclusion**: Not worth the added complexity, real-world costs eliminate any edge:
+- Short borrow fees: 0.5-2% annually
+- Higher rebalancing frequency
+- Short recall risk
+- Margin requirements
+
+### Root Cause Analysis
+
+**Model captures market exposure, not cross-sectional alpha**:
+- Top 10% outperform market by 0.2%/month
+- Bottom 10% also underperforms market by 0.07%/month
+- Correlation between longs and shorts: 0.95
+
+**What this means**:
+- Model is good at identifying stocks with positive beta
+- Model is weak at differentiating winners from losers
+- Alpha comes from market participation + modest selection edge
+
+### Final Strategy
+
+100% long-only with top 10% holdings:
+- Captures market beta (~15.5% annual)
+- Adds selection alpha (~2.3% annual)
+- Total: 17.9% annual with Sharpe 0.80
+
+
+
+## Summary: Key Principles
+
+Throughout this project, design decisions followed these principles:
+
+1. **Simplicity over complexity** (equal-weighting, single model)
+2. **Empirical validation** (test alternatives, measure impact)
+3. **Robustness over optimization** (constrained RF, no weight optimization)
+4. **Financial theory as guide** (factors, horizons based on research)
+5. **Production-ready** (realistic costs, executable strategy)
+
+**Result:** A strategy that is simple, explainable, robust, and profitable (Sharpe 0.80, Alpha 2.29%).
