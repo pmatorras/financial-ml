@@ -23,7 +23,7 @@ from financial_ml.portfolio.performance import (
 
 # Visualization
 from financial_ml.portfolio.visualization import (
-    draw_cumulative_drawdown
+    draw_cumulative_drawdown_all
 )
 
 # Diagnostics - import commonly used ones explicitly
