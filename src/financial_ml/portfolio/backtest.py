@@ -4,12 +4,58 @@ Portfolio backtesting orchestration.
 
 import pandas as pd
 import numpy as np
-from financial_ml.utils.paths import get_market_file, get_prediction_file, get_dir
+from financial_ml.utils.paths import (
+    get_market_file,
+    get_prediction_file,
+    get_dir
+    )
 from financial_ml.models import get_models
-from financial_ml.portfolio.diagnostics import print_model_agreement, compare_model_performance_by_period, analyze_prediction_stability, analyze_turnover, analyze_sector_concentration, analyze_beta_exposure, compare_drawdowns_to_spy, test_sharpe_significance, test_random_baseline
+from financial_ml.portfolio.diagnostics import(
+    analyze_beta_exposure,
+    analyze_prediction_stability,
+    analyze_turnover,
+    analyze_sector_concentration,
+    compare_drawdowns_to_spy,
+    compare_model_performance_by_period,
+    print_model_agreement,
+    test_sharpe_significance,
+    test_random_baseline
+    )
 from financial_ml.portfolio.performance import aggregate_portfolio_return, include_benchmark_return
 from financial_ml.portfolio.visualization import plot_cumulative_drawdown_all,plot_sector_concentration_over_time
 from financial_ml.portfolio.construction import construct_portfolio, smooth_predictions
+
+# In backtest.py or diagnostics.py
+from financial_ml.utils.config import SEPARATOR_WIDTH
+
+def validate_and_select_models(preds, requested_model):
+    """
+    Validate which models are available in predictions and select models for comparison.
+    
+    Args:
+        preds: DataFrame with prediction probabilities
+        requested_model: Model specified by user (e.g., 'rf')
+    
+    Returns:
+        List of valid model names to compare, or empty list if none found
+        
+    Raises:
+        ValueError: If requested_model is not found and no alternatives exist
+    """
+    available_models = preds['model'].unique().tolist()
+    if not available_models:
+        raise ValueError("No model prediction columns found in data! "
+                        "Expected columns like 'rf_prob', 'logreg_l2_prob', etc.")
+    
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print("MODEL AVAILABILITY CHECK")
+    print("\n" + "="* SEPARATOR_WIDTH)
+    print(f"Available models: {', '.join(available_models)}")
+    print(f"Requested model: {requested_model}")
+    
+    return available_models
+
+
 
 def run_backtest(args, per_top=10, per_bot=10):
     """
@@ -26,7 +72,8 @@ def run_backtest(args, per_top=10, per_bot=10):
     print("making calculations for", model)
     preds_nm = get_prediction_file(args)
     preds = pd.read_csv(preds_nm)
-
+    comparison_models = validate_and_select_models(preds=preds, requested_model=args.model)
+    n_models = len(comparison_models)
     if 'ensemble' in args.model:
         # Create ensemble predictions by averaging LogReg_L2 + RF_cal
         logreg_preds = preds[preds['model'] == 'logreg_l2'][['date', 'ticker', 'y_prob', 'y_true']].copy()
@@ -57,9 +104,17 @@ def run_backtest(args, per_top=10, per_bot=10):
     # Merge Predictions with Returns
     df = preds.merge(returns_realized, on=['date', 'ticker'], how='inner')
 
-    models =get_models()
-    print_model_agreement(df, models)
-    compare_model_performance_by_period(preds, returns_realized, models=['logreg_l2', model])
+    models =get_models(args)
+
+
+    if n_models>2:
+        print_model_agreement(df, models)
+        compare_model_performance_by_period(preds, returns_realized, models=comparison_models)#['logreg_l2', model])
+    else:
+        print("\n" + "*"* SEPARATOR_WIDTH)
+        print(f"WARNING: Skipping comparison, as only {n_models} model is available")
+        print("\n" + "*"* SEPARATOR_WIDTH)
+
     # Filter to best model (Logistic L2)
     df = df[df['model'] == model].copy()
     df = smooth_predictions(df, window=3)
@@ -154,9 +209,9 @@ def run_backtest(args, per_top=10, per_bot=10):
 
     test_sharpe_significance(portfolio_returns=portfolio_returns, sharpe_ratio=sharpe_ratio)
 
-
+    sentiment = f'(with sentiment)' if args.do_sentiment else ''
     print("=" * 60)
-    print(f"PORTFOLIO PERFORMANCE METRICS ({model},{args.type}), top{round(per_top)}% stocks")
+    print(f"PORTFOLIO PERFORMANCE METRICS: model: {model} {sentiment} \nportfolio type: {args.type}, (top {round(per_top)}% of stocks)")
     print("=" * 60)
     print(f"Sharpe Ratio:        {sharpe_ratio:.2f}")
     print(f"Max Drawdown:        {max_drawdown:.1%}")

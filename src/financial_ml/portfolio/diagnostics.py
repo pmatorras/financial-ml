@@ -132,7 +132,11 @@ def compare_model_performance_by_period(preds_df, returns_df, models):
     print("\n" + "="* SEPARATOR_WIDTH)
     print("MODEL PERFORMANCE BY PERIOD")
     print("="* SEPARATOR_WIDTH)
-    
+    if 'date' in preds_df.columns:
+        min_date = preds_df['date'].min()
+        max_date = preds_df['date'].max()
+        print(f"\nPrediction data available from: {min_date} to {max_date}")
+        print(f"Total months with data: {len(preds_df['date'].unique())}")
     for period in ['Bull 2016-2019', 'Mixed 2019-2022', 'Recovery 2022-2025']:
         period_data = df[df['period'] == period]
         
@@ -333,7 +337,6 @@ def analyze_sector_concentration(df_portfolio, sector_file=SP500_NAMES_FILE, lat
     if latest_date is None:
         latest_date = df_portfolio['date'].max()
     
-    print(df_portfolio.columns, sectors.columns)
     # Get holdings and merge with sector data
     holdings = df_portfolio[df_portfolio['date'] == latest_date].copy()
     holdings = holdings.merge(sectors[['ticker', 'GICS Sector']], on='ticker', how='left')

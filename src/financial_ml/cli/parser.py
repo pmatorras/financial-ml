@@ -1,9 +1,9 @@
 """Command-line argument parser setup."""
 import argparse
 from financial_ml.cli.validators import (
-    list_from_string, 
-    percentage, 
-    max_features_type, 
+    list_from_string,
+    max_features_type,
+    percentage,
     validate_max_samples
     )
 
@@ -30,6 +30,8 @@ def cli():
     p_train.add_argument('--tree-max-samples', help="Fraction of samples to train each tree (0.0-1.0), or None for all", type=validate_max_samples, default=None)
 
     p_train.add_argument('--trim-mode', help="Do we want a trimmed version of the fundamentals?", type=str, default='trim', choices= ["trim", "all"])
+    p_train.add_argument("--vix-interactions", "-vi", action="store_true", help="Calculate vix interactions")
+
     p_train.add_argument("-s", "--save", action="store_true", help="Save models")
 
 

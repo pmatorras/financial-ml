@@ -70,13 +70,8 @@ def train(args):
 
     # Create interaction terms to capture regime-dependent effects
     interaction_keys = []
-    if args.do_sentiment and sentiment_features is not None:
-        
-        interactions = calculate_vix_interactions(
-            market_features, 
-            sentiment_features, 
-            tickers
-        )
+    if args.vix_interactions and args.do_sentiment and sentiment_features is not None:
+        interactions = calculate_vix_interactions(market_features, sentiment_features, tickers)
         
         for name, df in interactions.items():
             input_vars.append(df)

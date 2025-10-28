@@ -53,6 +53,12 @@ def build_sanitize():
     return FunctionTransformer(_sanitize_infinities, validate=False)
 
 def get_models(args):
+    #Include defaults if args not defined 
+    n_estimators = getattr(args, 'tree_nestimators', 50) if args else 50
+    max_depth = getattr(args, 'tree_max_depth', 3) if args else 3
+    max_samples = getattr(args, 'tree_max_samples', None) if args else None
+    max_features = getattr(args, 'tree_max_features', 'log2') if args else 'log2'
+
     sanitize = build_sanitize()
     models = {
         "logreg_l1": Pipeline([
@@ -74,12 +80,12 @@ def get_models(args):
             ("sanitize", sanitize),                    # replace ±inf with NaN
             ("impute", SimpleImputer(strategy="median")),  # handle NaN
             ("scaler", "passthrough"),  # trees don"t need scaling
-            ("clf", RandomForestClassifier(n_estimators=args.tree_nestimators, 
-                                           max_depth=args.tree_depth,
+            ("clf", RandomForestClassifier(n_estimators=n_estimators, 
+                                           max_depth=max_depth,
                                            min_samples_split=0.02,
                                            min_samples_leaf=0.01,
-                                           max_samples=args.tree_max_samples,
-                                           max_features=args.tree_max_features,
+                                           max_samples=max_samples,
+                                           max_features=max_features,
                                            random_state=42,
                                            n_jobs=-1, 
                                            class_weight="balanced"
@@ -92,11 +98,12 @@ def get_models(args):
             ("scaler", "passthrough"),  # trees don"t need scaling
             ("clf", CalibratedClassifierCV(
                 estimator=RandomForestClassifier(
-                    n_estimators=50,
-                    max_depth=3,
+                    n_estimators=n_estimators,
+                    max_depth=max_depth,
                     min_samples_split=0.02,
                     min_samples_leaf=0.01,
-                    max_features='log2',
+                    max_samples=max_samples,
+                    max_features=max_features,
                     random_state=42,
                     n_jobs=-1,
                     class_weight="balanced"

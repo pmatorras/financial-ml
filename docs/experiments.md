@@ -9,7 +9,7 @@ This document tracks all model experiments and design choices throughout the pro
 - [Experiment 3: Ensemble Testing](#experiment-3-ensemble-testing)
 - [Experiment 4: Smoothing Impact](#experiment-5-smoothing-impact)
 - [Experiment 5: Feature Engineering](#experiment-5-feature-engineering)
-- [Experiment 6: VIX sentiment features](#experiment-6-vix-sentiment-features--interaction-terms)
+- [Experiment 6: VIX sentiment features](#experiment-6-vix-sentiment-features)
 - [Experiment 7: Random forest hyperparameter optimisation](#experiment-7-random-forest-hyperparameter-optimization)
 - [Summary of Final Configuration](#summary-of-final-configuration)
 
@@ -158,152 +158,155 @@ Raw predictions change significantly month-to-month (mean 5.18%)
 
 ---
 
-## Experiment 6: VIX Sentiment Features \& Interaction Terms
+## Experiment 6: VIX Sentiment Features
 
 **Date:** October 28, 2025
-**Goal:** Add market sentiment features (VIX) to improve regime-aware predictions
+**Goal:** Add market volatility (VIX) features to improve regime-aware predictions and portfolio performance
 
 ### Hypothesis:
 
-Market volatility (VIX) could improve stock selection by capturing regime-dependent behavior of momentum and volatility features.
+Market volatility affects stock selection - momentum and volatility features should work differently in calm vs volatile regimes. Adding VIX-based features could improve both predictive accuracy and portfolio returns.
 
-### Initial Approach: Raw VIX Features
+### Initial Baseline (No Sentiment):
 
-Added 3 VIX features:
-
-- `VIX`: Raw VIX level
-- `VIX_change_1m`: 1-month momentum
-- `VIX_zscore`: Z-score vs rolling mean
-
-
-### Results (17 features total):
-
-| Metric | No Sentiment | With VIX Features | Change |
-| :-- | :-- | :-- | :-- |
-| Test AUC | 0.5210 | 0.5307 | +9.7 bps  |
-| Variance (std) | 0.0094 | 0.0209 | +122%  |
-| Fold 1 (calm) | 0.517 | 0.524 | +0.7 bps |
-| Fold 2 (COVID) | 0.512 | 0.509 | -0.3 bps |
-| Fold 3 (elevated) | 0.534 | 0.559 | +2.5 bps |
-
-### Problem Identified:
-
-**High regime instability**
-
-- VIX features had importance std > mean (e.g., VIX_change_1m: importance 0.119 $\pm$ 0.170)
-- COVID extreme values (VIX=82) were out-of-distribution
-- Different folds had dramatically different VIX regimes
-
-
-### Feature Importance Analysis:
-
-Total VIX contribution: **25.1%** of model importance
-
-- But caused vol12 to drop 28% and BookToMarket to drop 26%
-- VIX features were **cannibalizing** existing volatility signals
+- Test AUC: 0.519
+- Portfolio Sharpe: 0.92
+- Annual Return: 20.2%
+- Alpha vs Random: 1.70%
 
 ***
 
-### Iteration 1: Add Interaction Terms
+### Iteration 1: VIX Features with Interactions
 
-**Approach:** Create regime-aware features
+**Approach:** Add VIX features plus multiplicative interactions
 
-- `mom121 × VIX_percentile`: Momentum works differently in high/low VIX
-- `vol12 × VIX_percentile`: Volatility signal amplified in volatile regimes
+**Features added (3 new, 15 total):**
 
-**Results (17 features: 3 VIX + 2 interactions):**
+1. `VIX_percentile`: Rolling 12-month percentile rank (0-1 scale)
+2. `mom121_x_VIX`: Momentum × VIX_percentile (clipped [0.25, 0.75])
+3. `vol12_x_VIX`: Stock volatility × VIX_percentile (clipped [0.25, 0.75])
+
+**Predictive Results:**
 
 
-| Metric | No Interactions | With Interactions | Change |
+| Metric | No Sentiment | With Interactions | $\Delta$(absolute) |
 | :-- | :-- | :-- | :-- |
-| Test AUC | 0.5307 | 0.5373 | +6.6 bps  |
-| Variance | 0.0209 | 0.0274 | +31%  |
-| Fold 2 (COVID) | 0.509 | 0.516 | +0.7 bps  |
-| Fold 3 | 0.559 | 0.576 | **+1.7 bps**  |
+| Test AUC | 0.519 | **0.527** | **+0.008** |
+| Fold 1 | 0.515 | 0.533 | +0.018 |
+| Fold 2 (COVID) | 0.512 | 0.518 | +0.006 |
+| Fold 3 | 0.535 | 0.530 | -0.005 |
 
-**Key finding:** Interactions helped where they should (volatile periods) but increased overall variance.
+**Portfolio Results:**
+
+
+| Metric | No Sentiment | With Interactions | $\Delta$(absolute) |
+| :-- | :-- | :-- | :-- |
+| Sharpe | **0.92** | 0.86 | **-0.06** |
+| Annual Return | **20.2%** | 18.9% | **-1.3%** |
+| Win Rate | **70.8%** | 66.0% | **-4.8%** |
+| Alpha vs Random | **1.70%** | 0.44% | **-1.26%** |
+| Max Drawdown | -23.0% | -24.4% | -1.4% worse |
+
+**Probability Distribution Analysis:**
+
+```
+NO sentiment:     [0.246, 0.807] range = 0.561
+WITH interactions: [0.419, 0.654] range = 0.235 (58% smaller!)
+```
+
+**Finding:**
+
+- **Test AUC improved** (+0.8 percentage points)
+- **Portfolio performance degraded significantly**
+- **Probability range compressed** - less conviction in top picks
+- **Barely beats random** (0.44% alpha)
+
+**Suspected root Cause:** Multiplicative interactions over-regularize predictions, compressing probability ranges and destroying signal at extremes (top/bottom 10% where portfolio selection happens).
 
 ***
 
-### Iteration 2: Simplify VIX Features
+### Iteration 2: VIX_percentile Only (No Interactions)
 
-**Approach:** Remove redundant features
+**Approach:** Use VIX as simple feature, let Random Forest learn interactions naturally
 
-- Drop: `VIX_log`, `VIX_change_1m` (redundant with vol12)
-- Keep: Only `VIX_percentile` + 2 interactions
+**Features added (1 new, 13 total):**
 
-**Results (15 features → 14 features):**
+- `VIX_percentile`: Rolling 12-month percentile rank (0-1 scale)
+
+**Predictive Results:**
 
 
-| Metric | All VIX (17) | Simplified (15) | Change |
+| Metric | No Sentiment | VIX Only | $\Delta$(absolute) |
 | :-- | :-- | :-- | :-- |
-| Test AUC | 0.5373 | 0.5290 | -8.3 bps |
-| Variance | 0.0274 | 0.0132 | **-52%**  |
+| Test AUC | 0.519 | **0.526** | **+0.007** |
+| Fold 1 | 0.515 | 0.516 | +0.001  |
+| Fold 2 (COVID) | 0.512 | **0.519** | **+0.007** |
+| Fold 3 | 0.535 | **0.542** | **+0.007** |
 
-**Massive stability improvement** with acceptable performance loss.
+**Portfolio Results:**
+
+
+| Metric | No Sentiment | VIX Only | $\Delta$(absolute) |
+| :-- | :-- | :-- | :-- |
+| Sharpe | 0.92 | **0.93** | **+0.01** |
+| Annual Return | 20.2% | **20.2%** | Equal |
+| Win Rate | 70.8% | 69.8% | -1.0% |
+| Alpha vs Random | 1.70% | **1.72%** | **+0.02%** |
+| Max Drawdown | -23.0% | **-22.9%** | **-0.1% better** |
+
+**Probability Distribution Analysis:**
+
+```
+NO sentiment:  [0.246, 0.807] range = 0.561
+VIX only:      [0.429, 0.643] range = 0.214 (moderately compressed)
+```
+
+**Finding:**
+
+- **Best Sharpe of all models** (0.93)
+- **Test AUC improved** (+0.007)
+- **All periods improved**, especially COVID (+0.007)
+- **Portfolio performance maintained** (20.2% return)
+- **Still beats random convincingly** (1.72% alpha)
+- **Better downside protection** (-22.9% vs -23.0%)
+
+**Why It Works:**
+Random Forest can **learn non-linear interactions** between VIX_percentile and other features:
+
+- In calm markets (VIX_percentile < 0.3): Value and momentum work well
+- In volatile markets (VIX_percentile > 0.7): Quality factors dominate
+- RF learns these patterns **adaptively** without forcing functional form
 
 ***
 
-### Iteration 3: Clip Interaction Values
+### Iteration 3: Calibration Test (rf_cal + VIX_percentile)
 
-**Approach:** Reduce extreme regime effects
+**Approach:** Test if calibration helps with VIX features
 
-- Clip `VIX_percentile` to `[0.25, 0.75]` before multiplying
-- Reduces regime range from 10x to 3x
-
-**Clip Range Grid Search:**
+**Results:**
 
 
-| Clip Range | Test AUC | Variance | Notes |
+| Metric | rf + VIX | rf_cal + VIX | Change |
 | :-- | :-- | :-- | :-- |
-| [0.2, 0.8] | **0.5310** | 0.0142 | Best performance |
-| **[0.25, 0.75]** | **0.5303** | **0.0123** | **Best balance** |
-| [0.3, 0.7] | 0.5280 | 0.0122 | Overconstrained |
-| [0.35, 0.65] | 0.5283 | 0.0108 | Too narrow |
+| Sharpe | **0.93** | 0.79 | **-0.14** |
+| Annual Return | **20.2%** | 17.8% | **-2.4%** |
+| Alpha vs Random | **1.72%** | **-0.69%** | **-2.41%** |
 
+**Probability Distribution:**
 
-***
+```
+rf + VIX:      [0.429, 0.643] range = 0.214
+rf_cal + VIX:  [0.277, 0.823] range = 0.546 (stretched back out)
+```
 
-### Final Configuration: Simplified + Clipped VIX
+**Finding:**
 
-**Features (15 total):**
+- **Calibration destroys performance** with VIX features
+- **Loses to random selection** (-0.69% alpha)
+- **Worst performer** despite wide probability range
 
-- 12 base features (market + fundamentals)
-- 1 VIX feature: `VIX_percentile`
-- 2 interactions: `mom121 × VIX`, `vol12 × VIX` (clipped [0.25, 0.75])
-
-**Performance:**
-
-
-| Metric | Baseline | Final | Improvement |
-| :-- | :-- | :-- | :-- |
-| Test AUC | 0.5210 | **0.5303** | **+9.3 bps** |
-| Variance | 0.0094 | 0.0123 | +31% (acceptable) |
-| Fold 1 | 0.517 | 0.527 | +1.0 bps |
-| Fold 2 (COVID) | 0.512 | 0.517 | +0.5 bps |
-| Fold 3 | 0.534 | 0.547 | +1.3 bps |
-
-**Feature Importance:**
-
-- Interactions: ~23% combined importance (rank \#3 and \#4)
-- Successfully captured regime effects without excessive redundancy
-
-***
-
-### Key Learnings:
-
-1. **VIX adds value (+9.3 bps)** but must be used carefully to avoid regime instability
-2. **Interaction terms > raw VIX features** for regime-aware modeling
-3. **Simplification crucial**: Dropped 3 VIX features, kept 1 + 2 interactions → 52% variance reduction
-4. **Clipping optimal at [0.25, 0.75]**: Balances performance and stability
-5. **Random Forest already robust to multicollinearity** - problem was regime dependency, not feature correlation
-
-### Decision:
-
- **Use simplified + clipped VIX interactions:**
-
-- `VIX_percentile` + `mom121_x_VIX` + `vol12_x_VIX` (clipped [0.25, 0.75])
-- Best risk-adjusted improvement: +9.3 bps with controlled variance
+**Why Calibration Fails:**
+Calibration stretches probabilities based on **average frequencies**, but VIX creates **regime-dependent distributions**. The stretched probabilities don't correlate with regime-specific returns, making selections worse than random.
 
 ***
 
@@ -353,7 +356,7 @@ RandomForestClassifier(
 - **Depth 3 wins** on test AUC (best performance)
 - Deeper trees (4-5) **overfit**: higher train AUC but worse test AUC
 - Gap increases dramatically: 0.059 → 0.071 → 0.084
-- Depth 4 has lower variance (0.005) but loses -0.2 bps test AUC
+- Depth 4 has lower variance (0.005) but loses -0.002 test AUC
 - **With weak signal (AUC ~0.53), shallower trees generalize better**
 
 **Decision: Keep max_depth=3**
@@ -376,8 +379,8 @@ RandomForestClassifier(
 **Key Findings:**
 
 - log2 and sqrt are basically identical (logical since both sqrt(15)~log2(15)~4)
-- max_features=0.4 has **best average** (+0.2 bps) but **2x variance** (0.007 → 0.014)
-- **COVID fold (Fold 2) suffers** with more features: 0.518 → 0.509 (-0.9 bps)
+- max_features=0.4 has **best average** (+0.002) but **2x variance** (0.007 → 0.014)
+- **COVID fold (Fold 2) suffers** with more features: 0.518 → 0.509 (-0.009)
 - More features = **less tree diversity** = worse regime robustness
 
 **Reasoning:**
@@ -407,7 +410,7 @@ With weak signal + regime changes, need high tree diversity:
 - **More trees = worse performance!** (counterintuitive)
 - 50 trees: Best test AUC and best generalization
 - 100/200 trees: Train AUC increases but test AUC decreases → **overfitting**
-- Variance reduction minimal: 0.007 → 0.005 (not worth -0.1 to -0.3 bps loss)
+- Variance reduction minimal: 0.007 → 0.005 (not worth -0.001 to -0.003 loss)
 
 **Reasoning:**
 With extremely weak signal (AUC ~0.53):
@@ -435,7 +438,7 @@ With extremely weak signal (AUC ~0.53):
 
 **Key Findings:**
 
-- Subsampling **hurts performance**: -0.4 bps with 80-90% samples
+- Subsampling **hurts performance**: -0.004 with 80-90% samples
 - Signal already weak → reducing data makes it worse
 - Not overfitting (gap = 0.059 is healthy) → no need for regularization
 - Variance improvement minimal: 0.007 → 0.006 (not worth AUC loss)
@@ -447,93 +450,117 @@ Subsampling helps when:
 - Strong signal (yours is weak)
 - High variance (yours is 0.007, already low)
 
-**Decision:** ✅ **Keep max_samples=None**
+**Decision:** **Keep max_samples=None**
 
 ***
 
-## Final Optimized Configuration
+### Final Performance vs Baseline:
 
-After testing **13 different configurations** across 4 phases:
+| Metric | Baseline (no sentiment) | **Final (VIX only)** | $\Delta$(absolute) |
+| :-- | :-- | :-- | :-- |
+| **Test AUC** | 0.519 | **0.526** | **+0.007**  |
+| **Sharpe** | 0.92 | **0.93** | **+0.01**  |
+| **Annual Return** | 20.2% | **20.2%** | Equal  |
+| **Win Rate** | 70.8% | 69.8% | -1.0% |
+| **Alpha vs Random** | 1.70% | **1.72%** | **+0.02%**  |
+| **Max Drawdown** | -23.0% | **-22.9%** | **+0.1%**  |
 
-```python
-RandomForestClassifier(
-    n_estimators=50,           # Phase 3: Confirmed optimal 
-    max_depth=3,               # Phase 1: Confirmed optimal 
-    min_samples_split=100,     # Not optimized (keep default)
-    min_samples_leaf=50,       # Not optimized (keep default)
-    max_features='log2',       # Phase 2: Confirmed optimal 
-    max_samples=None,          # Phase 4: Confirmed optimal 
-    random_state=42,
-    n_jobs=-1,
-    class_weight="balanced"
-)
-```
-
-**Final Performance:**
-
-- Test AUC: **0.527** (unchanged from baseline!)
-- Test Std: **0.007** (very stable)
-- Train-Test Gap: **0.059** (healthy)
-- vs No Sentiment: **+0.6 bps improvement**
+**Total features: 13** (12 base + 1 VIX)
 
 ***
 
 ## Key Learnings
 
-### 1. **Simpler is Better with Weak Signals**
+### 1. **Feature Engineering Can Hurt Random Forests**
 
-Every attempt to increase complexity (deeper trees, more features, more trees) **degraded performance**:
+| Approach | Test AUC | Portfolio Sharpe | Interpretation |
+| :-- | :-- | :-- | :-- |
+| Engineered interactions | 0.527 | 0.86 | Forced functional form hurts |
+| Simple feature | 0.526 | **0.93** | RF learns optimal interactions  |
 
-- Shallow trees (depth 3) > deep trees (depth 5)
-- Fewer features/split (log2) > more features (0.4)
-- Fewer trees (50) > more trees (200)
-- Full bootstrap (100%) > subsampling (80%)
+**Lesson:** With Random Forests, **simple features > complex interactions**. The tree structure naturally discovers non-linear relationships without manual engineering.
+
+### 2. **AUC ≠ Portfolio Performance**
+
+All three VIX approaches improved test AUC:
+
+- With interactions: +0.008 AUC, but -0.06 Sharpe
+- VIX only: +0.007  AUC, **+0.01 Sharpe** 
+- Calibrated: Better AUC, but -0.69% alpha (loses to random!)
+
+**AUC measures ranking across all thresholds**, but portfolios select **only the top 10%**. Performance at extremes matters more than average ranking.
+
+### 3. **Probability Compression is a Red Flag**
+
+| Configuration | Prob Range | Portfolio Alpha |
+| :-- | :-- | :-- |
+| Baseline | 0.561 | 1.70%  |
+| VIX only | 0.214 | 1.72%  |
+| VIX interactions | 0.235 | 0.44%  |
+
+**VIX only** compresses probabilities but still works because:
+
+- Compression is **moderate** (not extreme)
+- **Ranking within compressed range** still informative
+- RF maintains enough spread for top 10% selection
+
+**VIX interactions** compress too much:
+
+- Model becomes overly cautious
+- Less conviction in winners
+- Top 10% threshold too close to median
 
 
-### 2. **Default Hyperparameters Were Already Near-Optimal**
+### 4. **Calibration Requires Careful Consideration**
 
-All 4 optimization phases confirmed the original configuration was correct. This is **rare** in ML!
+Calibration helped baseline model (0.92 Sharpe), but **destroyed VIX model** (0.79 Sharpe).
 
-Reason: Configuration was already tuned for:
+**When calibration fails:**
 
-- Weak signal (AUC ~0.53)
-- Limited data (~100k samples)
-- Regime instability (3 different market periods)
+- Features create **regime-dependent distributions**
+- Average calibration curve doesn't apply to all regimes
+- Stretched probabilities mislead portfolio selection
 
+**Lesson:** Calibration assumes **single stable distribution**. With regime features (VIX), this assumption breaks.
 
-### 3. **Optimization Revealed Why Alternatives Failed**
+### 5. **Regime Features Should Be Simple**
 
-| Alternative | Why It Failed |
-| :-- | :-- |
-| Depth 4-5 | Overfit (gap increased to 0.071-0.084) |
-| max_features 0.4 | Reduced tree diversity → hurt COVID fold |
-| n_estimators 200 | Over-averaged away weak signal |
-| max_samples 0.8 | Removed too much data from weak signal |
+**What worked:**
 
-### 4. **Variance-Performance Tradeoff Visible**
+- `VIX_percentile`: Binary question ("high or low volatility?")
+- Single value per time period
+- Let model decide how it matters
 
-Multiple configs improved variance but hurt test AUC:
+**What failed:**
 
-- Depth 4: std 0.007→0.005 but AUC -0.2 bps
-- 100 trees: std 0.007→0.005 but AUC -0.1 bps
+- Multiplicative interactions (`mom121 × VIX`)
+- Forced assumptions about functional form
+- Over-regularization
 
-**Decision rule:** Don't sacrifice performance for minimal variance gains
+**Principle:** Regime features should **flag conditions**, not **modify features directly**.
 
-### 5. **COVID Fold (Fold 2) is the Canary**
+### 6. **Random Baseline Test is Critical**
 
-Changes that hurt Fold 2 (COVID period) were consistently bad:
+| Model | Alpha vs Random | Usable? |
+| :-- | :-- | :-- |
+| VIX only | 1.72% |  YES |
+| VIX interactions | 0.44% |  Marginal |
+| rf_cal + VIX | -0.69% |  NO |
 
-- max_features 0.4: Fold 2 dropped to 0.509 (-0.9 bps)
-- This fold is hardest to predict → best indicator of robustness
+Without random baseline testing, we might have shipped a model that **loses to random stock picking**!
 
 ***
 
 ## Conclusion
 
-**Systematic hyperparameter optimization validated the baseline configuration.** The original hyperparameters were already optimal for this:
+**Final model: rf with VIX_percentile only**
 
-- Weak signal regime (AUC ~0.53)
-- Regime-dependent data (calm/COVID/elevated VIX periods)
-- Limited sample size with complex features (15 features, VIX interactions)
+Achieved:
 
-**Result:** No hyperparameter changes needed. Current configuration is production-ready.
+-  Best Sharpe of all tested models (0.93)
+-  Improved test AUC (+0.007)
+-  Maintained portfolio returns (20.2%)
+-  Better downside protection
+-  Significant alpha vs random (1.72%)
+
+**Key insight:** Simple features + powerful model (Random Forest) > Complex feature engineering. Let the algorithm discover interactions rather than imposing them.
