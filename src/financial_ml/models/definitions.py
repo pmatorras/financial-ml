@@ -52,7 +52,7 @@ def build_sanitize():
     """Create transformer to replace infinite values with NaN."""
     return FunctionTransformer(_sanitize_infinities, validate=False)
 
-def get_models():
+def get_models(args):
     sanitize = build_sanitize()
     models = {
         "logreg_l1": Pipeline([
@@ -74,11 +74,12 @@ def get_models():
             ("sanitize", sanitize),                    # replace ±inf with NaN
             ("impute", SimpleImputer(strategy="median")),  # handle NaN
             ("scaler", "passthrough"),  # trees don"t need scaling
-            ("clf", RandomForestClassifier(n_estimators=50, 
-                                           max_depth=3,
+            ("clf", RandomForestClassifier(n_estimators=args.tree_nestimators, 
+                                           max_depth=args.tree_depth,
                                            min_samples_split=0.02,
                                            min_samples_leaf=0.01,
-                                           max_features='log2',#'sqrt',
+                                           max_samples=args.tree_max_samples,
+                                           max_features=args.tree_max_features,
                                            random_state=42,
                                            n_jobs=-1, 
                                            class_weight="balanced"

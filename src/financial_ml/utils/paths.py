@@ -21,12 +21,8 @@ def get_market_file(args):
 
 def get_sentiment_file(args):
     """Get path to sentiment data CSV"""
-    data_dir = get_dir(args, 'data')
-    
-    if args.test:
-        return data_dir / "sentiment_test.csv"
-    else:
-        return data_dir / "sentiment.csv"
+    data_dir = DATA_DIR
+    return data_dir / "sentiment.csv"
     
 
 def get_fundamental_file(args):
@@ -52,6 +48,9 @@ def get_dir(args, dir_type):
     else:
         print("file_dir not generated, please check", args, dir_type)
         exit()
+    if hasattr(args, 'do_sentiment') and args.do_sentiment:
+        file_dir = file_dir / 'sentiment'
+        file_dir.mkdir(parents=True, exist_ok=True)
 
     if hasattr(args, 'only_market') and args.only_market:
         file_dir = file_dir / 'only_market'

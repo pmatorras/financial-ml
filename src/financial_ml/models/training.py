@@ -3,8 +3,18 @@ import numpy as np
 import joblib
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from financial_ml.utils.config import DEBUG_DIR, FUNDA_KEYS, MARKET_KEYS, SENTIMENT_KEYS, CANONICAL_CONCEPTS, N_SPLITS
-from financial_ml.utils.paths import get_prediction_file, get_model_file, get_features_file
+from financial_ml.utils.config import (
+    DEBUG_DIR, 
+    FUNDA_KEYS, 
+    MARKET_KEYS, 
+    CANONICAL_CONCEPTS, 
+    N_SPLITS
+    )
+from financial_ml.utils.paths import (
+    get_features_file,
+    get_model_file,
+    get_prediction_file
+    ) 
 from financial_ml.utils.logging import save_training_summary
 from financial_ml.models.definitions import get_model_name, get_models
 from financial_ml.data import (
@@ -18,13 +28,16 @@ from financial_ml.data import (
     create_binary_labels,
     to_monthly_ffill,
     widen_by_canonical
-) 
+    ) 
 
-from financial_ml.data.features import calculate_enhanced_features
+from financial_ml.data.features import (
+    calculate_enhanced_features,
+    broadcast_market_feature_to_stocks,
+    calculate_vix_interactions
+    )
 
 
 
-from financial_ml.data.features import broadcast_market_feature_to_stocks
 
 def train(args):
     prices, spy_benchmark = load_market(args)
@@ -38,23 +51,42 @@ def train(args):
     funda_keys = []
     df_keys = market_keys.copy()    
     # safe copy for concat keys
-    doSentiment=True
+
     sentiment_features = None
     sentiment_keys = []
     if args.do_sentiment:
         try:
             sentiment = load_sentiment(args)
-            sentiment_features = calculate_sentiment_features(sentiment)  # dict of Series
+            sentiment_features = calculate_sentiment_features(sentiment, args.trim_mode) 
             
             for name, series in sentiment_features.items():
                 df = broadcast_market_feature_to_stocks(series, tickers)
                 input_vars.append(df)
                 sentiment_keys.append(name)
             
-            print(f"✅ Added sentiment features: {sentiment_keys}")
+            if args.verbose or args.debug: print(f"Added sentiment features: {sentiment_keys}")
         except FileNotFoundError:
             print("⚠️ No sentiment data found")
-    df_keys = market_keys + sentiment_keys
+
+    # Create interaction terms to capture regime-dependent effects
+    interaction_keys = []
+    if args.do_sentiment and sentiment_features is not None:
+        
+        interactions = calculate_vix_interactions(
+            market_features, 
+            sentiment_features, 
+            tickers
+        )
+        
+        for name, df in interactions.items():
+            input_vars.append(df)
+            interaction_keys.append(name)
+        
+        if interaction_keys and (args.verbose or args.debug):
+            print(f"Added interaction features: {interaction_keys}")
+    
+    # Update df_keys to include interactions
+    df_keys = market_keys + sentiment_keys + interaction_keys
 
     if not args.only_market:
         funda_keys = FUNDA_KEYS
@@ -70,7 +102,7 @@ def train(args):
             wide = widen_by_canonical(prices=prices, monthly=monthly, canonical_key=tag)
             input_vars.append(wide)
             df_keys.append(tag)
-        input_keys = market_keys +  funda_keys + sentiment_keys
+        input_keys = market_keys +  funda_keys + sentiment_keys + interaction_keys
 
     if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
@@ -81,8 +113,7 @@ def train(args):
             print(k, type(df.index), df.index.min(), df.index.max(), df.shape)
     feat = pd.concat(input_vars, axis=1, keys=df_keys)
     if args.debug: feat.to_csv(DEBUG_DIR/"feat.csv")
-    print("NaN counts per feature BEFORE stacking:")
-    print(feat.isna().sum())
+
     y = create_binary_labels(prices, spy_benchmark)
 
     # Align and stack panel to long format
@@ -120,9 +151,6 @@ def train(args):
     #Add the Y to the datafrane
     y_long = y.stack().rename("y")
     df = feat_long.join(y_long, how="inner")
-    print(f"before first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
-    #df = df.dropna()
-    print(f"After first dropna: {len(df)} rows, {df.index.get_level_values(1).nunique()} unique tickers")
     require_non_empty(df, "feat_join_ylong")
 
     # Train/validation split: expanding window via TimeSeriesSplit
@@ -135,9 +163,10 @@ def train(args):
     require_non_empty(df, "df_sorted")
 
     # Show which features in input_keys have the most NaN
-    print("\nNaN counts in input_keys:")
-    nan_in_input_keys = df[input_keys].isnull().sum().sort_values(ascending=False)
-    print(nan_in_input_keys[nan_in_input_keys > 0])
+    if args.verbose or args.debug:
+        print("\nNaN counts in input_keys:")
+        nan_in_input_keys = df[input_keys].isnull().sum().sort_values(ascending=False)
+        print(nan_in_input_keys[nan_in_input_keys > 0])
 
     # Show which tickers are getting dropped
     if 'ticker' in df.columns:
@@ -146,11 +175,11 @@ def train(args):
         tickers_after = set(df_after['ticker'].unique())
         dropped_tickers = tickers_before - tickers_after
         print(f"\nTickers dropped: {len(dropped_tickers)} out of {len(tickers_before)}")
-        print(f"Sample dropped tickers: {sorted(list(dropped_tickers))[:20]}")
-        print(f"Sample surviving tickers: {sorted(list(tickers_after))[:20]}")
-        #exit()
+        if (len(dropped_tickers)>0): print(f"Sample dropped tickers: {sorted(list(dropped_tickers))[:20]}")
+        if (len(dropped_tickers)>20): print(f"Sample surviving tickers: {sorted(list(tickers_after))[:20]}")
+
         # For a few dropped tickers, show which features are NaN
-        if dropped_tickers:
+        if dropped_tickers and (args.verbose or args.debug):
             sample_dropped = list(dropped_tickers)[:3]
             print(f"\nWhy these tickers were dropped:")
             for ticker in sample_dropped:
@@ -162,12 +191,11 @@ def train(args):
 
 
     df = df.dropna(subset=input_keys)
-    print(f"\nafter second dropna: {len(df)} rows")
+    if args.verbose or args.debug: print(f"\nafter second dropna: {len(df)} rows")
     if not args.only_market:
-        if 'ticker' in df.columns:
+        if 'ticker' in df.columns and (args.verbose or args.debug):
             print(f"  Unique tickers: {df['ticker'].nunique()}")
             print(f"  Sample tickers: {sorted(df['ticker'].unique())[:20]}")
-        print(f"DTE Leverage: {len(df[df['ticker']=='DTE'])} total, {df[df['ticker']=='DTE']['Leverage'].notna().sum()} non-null")
 
     # Define features to exclude
     exclude_features = ['ClosePrice', 'LogMktCap']
@@ -187,7 +215,7 @@ def train(args):
     tscv = TimeSeriesSplit(n_splits=N_SPLITS,test_size=36,gap=1)
 
     pred_rows = []
-    models = get_models()
+    models = get_models(args)
     trained_models = {}
     fold_results = {}
     print(f"Available models [{len(models)}]: {', '.join(sorted(models))}")
@@ -252,22 +280,25 @@ def train(args):
             fold_results[name].append(fold_info)
 
         trained_models[name] = pipe
-        print("Baseline logistic train AUC ("+name+"):", np.round(aucs_train, N_SPLITS).tolist())
-        print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, N_SPLITS).tolist())
-
-    pred_df = pd.concat(pred_rows, ignore_index=True)
-    predpath = get_prediction_file(args)
-    pred_df.to_csv(predpath, index=False)
+        if 'rf' in name: print(f"Tree depth={args.tree_depth}, max features={args.tree_max_features}, nestimators: {args.tree_nestimators}, max samples: {args.tree_max_samples}")
+        print("Baseline logistic train AUC ("+name+"):", np.round(aucs_train, 3).tolist(), f"mean: {np.round(np.mean(aucs_train),3)} +- {np.round(np.std(aucs_train),3)}")
+        print("Baseline logistic test  AUC ("+name+"):", np.round(aucs_test, 3).tolist(), f"mean: {np.round(np.mean(aucs_test),3)} +- {np.round(np.std(aucs_test),3)}")
 
 
-    # Save trained models and information
-    save_training_summary(fold_results, input_keys, args)
-    for model_name, model_pipeline in trained_models.items():
-        models_path = get_model_file(args, model_name)
-        joblib.dump(model_pipeline, models_path)
-        print(f"Saved {model_name} to {models_path}")
-    feature_path = get_features_file(args)
-    with open(feature_path, 'w') as f:
-        f.write('\n'.join(input_keys))
+    if args.save:
+        #Save prediction files
+        pred_df = pd.concat(pred_rows, ignore_index=True)
+        predpath = get_prediction_file(args)
+        pred_df.to_csv(predpath, index=False)
+
+        # Save trained models and information
+        save_training_summary(fold_results, input_keys, args)
+        for model_name, model_pipeline in trained_models.items():
+            models_path = get_model_file(args, model_name)
+            joblib.dump(model_pipeline, models_path)
+            print(f"Saved {model_name} to {models_path}")
+        feature_path = get_features_file(args)
+        with open(feature_path, 'w') as f:
+            f.write('\n'.join(input_keys))
 
     
