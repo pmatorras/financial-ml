@@ -39,7 +39,15 @@ MARKET_KEYS = [
     "r12", 
     "mom121",
     "vol3",
-    "vol12"]
+    "vol12"
+    ]
+
+SENTIMENT_KEYS = [
+    'VIX', 
+    'VIX_change_1m', 
+    'VIX_zscore'
+    ]
+
 FUNDA_KEYS  = [
     "BookToMarket",
     "ROE",

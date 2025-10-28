@@ -19,6 +19,16 @@ def get_market_file(args):
     print("opening", csv_filenm)
     return csv_filenm
 
+def get_sentiment_file(args):
+    """Get path to sentiment data CSV"""
+    data_dir = get_dir(args, 'data')
+    
+    if args.test:
+        return data_dir / "sentiment_test.csv"
+    else:
+        return data_dir / "sentiment.csv"
+    
+
 def get_fundamental_file(args):
     '''Get path to fundamental data file based on the run mode'''
     if args.debug: csv_filenm =SP500_FUNDA_DEBUG

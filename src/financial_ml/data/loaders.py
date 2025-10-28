@@ -1,5 +1,9 @@
+'''
+Load all information from markets, fundamentals or sentiment
+'''
+
 import pandas as pd
-from financial_ml.utils.paths import get_market_file, get_fundamental_file
+from financial_ml.utils.paths import get_market_file, get_fundamental_file, get_sentiment_file
 from financial_ml.utils.config import DEBUG_DIR
 
 def normalize_ticker(ticker):
@@ -60,3 +64,21 @@ def load_fundamentals(args, required_keys=None, keep_unmapped=False):
             out.to_csv(DEBUG_DIR/"fsel.csv")
         
         return out
+    
+def load_sentiment(args):
+    """
+    Load sentiment indicators (VIX, etc.) from CSV
+    
+    Args:
+        args: Namespace (for test mode, etc.)
+    
+    Returns:
+        pd.DataFrame with sentiment indicators indexed by date
+    """
+    csv_filenm = get_sentiment_file(args)
+    print(f"Loading sentiment data from {csv_filenm}")
+    
+    sentiment = pd.read_csv(csv_filenm, index_col=0, parse_dates=True)
+    sentiment = sentiment.apply(pd.to_numeric, errors='coerce').sort_index()
+    
+    return sentiment

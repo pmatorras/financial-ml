@@ -106,6 +106,43 @@ def calculate_market_features(prices,args):
         "vol12": vol_12m
     }
 
+def calculate_sentiment_features(sentiment_data):
+    """
+    Calculate sentiment-based features (VIX derivatives)
+    
+    Args:
+        sentiment_data: DataFrame from load_sentiment() with VIX column
+    
+    Returns:
+        dict of {feature_name: pd.Series} indexed by date
+    """
+    vix = sentiment_data['VIX']
+    
+    # Calculate features as Series (NOT broadcast to tickers)
+    return {
+        'VIX': vix,
+        'VIX_change_1m': vix.pct_change(21),
+        'VIX_zscore': (vix - vix.rolling(252, min_periods=60).mean()) / 
+                      vix.rolling(252, min_periods=60).std(),
+    }
+
+def broadcast_market_feature_to_stocks(market_feature_series: pd.Series, tickers: list) -> pd.DataFrame:
+    """
+    Broadcast a market-wide feature (Series indexed by date)
+    into a DataFrame of shape (dates x tickers) by repeating values
+    
+    Args:
+        market_feature_series: pd.Series indexed by date
+        tickers: list of ticker strings
+    
+    Returns:
+        pd.DataFrame indexed by dates, columns=tickers
+    """
+    values = market_feature_series.values[:, None]  # (n_dates, 1)
+    data = np.repeat(values, len(tickers), axis=1)  # (n_dates, n_tickers)
+    df = pd.DataFrame(data, index=market_feature_series.index, columns=tickers)
+    return df
+
 def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") -> pd.Series:
     '''
     Function to deal with sometimes empty mkcap values.

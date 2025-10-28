@@ -13,6 +13,7 @@ def cli():
     p_info = sub.add_parser("market", help="Download/refresh market data")
     p_info.add_argument("--newtable","-nt", action="store_true", help="Refresh S&P 500 constituents")
     p_info.add_argument("--newinfo", "-ni", action="store_true", help="Refresh historical market data")
+    p_sentiment = sub.add_parser("sentiment", help="Download/refresh sentiment data")
 
     p_funda = sub.add_parser("fundamentals", help="Download/refresh fundamentals")
 
@@ -26,11 +27,13 @@ def cli():
     p_portfolio.add_argument('--pertop', help="Percentage top portfolio used", type=percentage, default=10)
     p_portfolio.add_argument('--perbot', help="Percentage bottom portfolio used", type=percentage, default=10)
 
-    for sp in (p_info, p_funda, p_anal, p_train, p_portfolio):
+    for sp in (p_info, p_sentiment, p_funda, p_anal, p_train, p_portfolio):
         sp.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
         sp.add_argument("--only-market", dest="only_market",
                          help="Explicitly don't include fundamentals in training features", action="store_true")
+        sp.add_argument("--do-sentiment", dest="do_sentiment",
+                         help="Explicitly include sentimental data in training features", action="store_true")      
         sp.add_argument('--use-enhanced', action='store_true', help='Include enhanced features (ranks, interactions, reversal)')
         sp.add_argument("--ticker", help="chose ml to display", type=list_from_string, default=None)
         sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb", "ensemble"])

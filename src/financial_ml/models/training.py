@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import roc_auc_score
-from financial_ml.utils.config import DEBUG_DIR, FUNDA_KEYS, MARKET_KEYS, CANONICAL_CONCEPTS, N_SPLITS
+from financial_ml.utils.config import DEBUG_DIR, FUNDA_KEYS, MARKET_KEYS, SENTIMENT_KEYS, CANONICAL_CONCEPTS, N_SPLITS
 from financial_ml.utils.paths import get_prediction_file, get_model_file, get_features_file
 from financial_ml.utils.logging import save_training_summary
 from financial_ml.models.definitions import get_model_name, get_models
@@ -11,7 +11,9 @@ from financial_ml.data import (
     require_non_empty,
     load_market,
     load_fundamentals,
+    load_sentiment,
     calculate_market_features,
+    calculate_sentiment_features,
     compute_fundamental_ratios, 
     create_binary_labels,
     to_monthly_ffill,
@@ -22,17 +24,37 @@ from financial_ml.data.features import calculate_enhanced_features
 
 
 
+from financial_ml.data.features import broadcast_market_feature_to_stocks
 
 def train(args):
     prices, spy_benchmark = load_market(args)
     require_non_empty(prices, "prices")
+    tickers = prices.columns.tolist()
 
     market_features = calculate_market_features(prices,args)
 
     input_vars = list(market_features.values())
-    market_keys = MARKET_KEYS
+    market_keys = MARKET_KEYS 
     funda_keys = []
-    df_keys = market_keys.copy()          # safe copy for concat keys
+    df_keys = market_keys.copy()    
+    # safe copy for concat keys
+    doSentiment=True
+    sentiment_features = None
+    sentiment_keys = []
+    if args.do_sentiment:
+        try:
+            sentiment = load_sentiment(args)
+            sentiment_features = calculate_sentiment_features(sentiment)  # dict of Series
+            
+            for name, series in sentiment_features.items():
+                df = broadcast_market_feature_to_stocks(series, tickers)
+                input_vars.append(df)
+                sentiment_keys.append(name)
+            
+            print(f"✅ Added sentiment features: {sentiment_keys}")
+        except FileNotFoundError:
+            print("⚠️ No sentiment data found")
+    df_keys = market_keys + sentiment_keys
 
     if not args.only_market:
         funda_keys = FUNDA_KEYS
@@ -42,16 +64,14 @@ def train(args):
         if args.debug: monthly.to_csv(DEBUG_DIR/"monthly.csv")
         monthly.name = "CommonStockSharesOutstanding"
 
-        shares = monthly
         require_non_empty(monthly, "CommonStockSharesOutstanding")
 
-        # 2) Non-share concepts by exact metric (unchanged behavior)
-        df_keys = MARKET_KEYS.copy()
         for tag in CANONICAL_CONCEPTS:
             wide = widen_by_canonical(prices=prices, monthly=monthly, canonical_key=tag)
             input_vars.append(wide)
             df_keys.append(tag)
-    input_keys=market_keys+funda_keys
+        input_keys = market_keys +  funda_keys + sentiment_keys
+
     if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
         exit()
@@ -61,9 +81,9 @@ def train(args):
             print(k, type(df.index), df.index.min(), df.index.max(), df.shape)
     feat = pd.concat(input_vars, axis=1, keys=df_keys)
     if args.debug: feat.to_csv(DEBUG_DIR/"feat.csv")
-    
+    print("NaN counts per feature BEFORE stacking:")
+    print(feat.isna().sum())
     y = create_binary_labels(prices, spy_benchmark)
-
 
     # Align and stack panel to long format
     feat_long = feat.stack(level=1,future_stack=True)
