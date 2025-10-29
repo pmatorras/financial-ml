@@ -24,14 +24,15 @@ from financial_ml.portfolio.performance import (
 # Visualization
 from financial_ml.portfolio.visualization import (
     plot_cumulative_drawdown_all,
-    plot_sector_concentration_over_time
+    plot_sector_concentration_over_time,
+    plot_correlation_matrix
 )
 
 # Diagnostics - import commonly used ones explicitly
 from financial_ml.portfolio.diagnostics import (
     pre_filter_diagnostics,
-    print_model_agreement,
-    model_agreement_correlations,
+    analyze_model_agreement,
+    calculate_model_agreement_correlations,
     compare_model_performance_by_period,
     analyze_prediction_stability,
     analyze_turnover,
@@ -56,12 +57,14 @@ __all__ = [
     'include_benchmark_return',
     
     # Visualization
-    'draw_cumulative_drawdown',
+    'plot_cumulative_drawdown_all',
+    'plot_sector_concentration_over_time',
+    'plot_correlation_matrix',
     
     # Diagnostics
     'pre_filter_diagnostics',
-    'print_model_agreement',
-    'model_agreement_correlations',
+    'analyze_model_agreement',
+    'calculate_model_agreement_correlations',
     'compare_model_performance_by_period',
     'analyze_prediction_stability',
     'analyze_turnover',

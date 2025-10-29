@@ -41,6 +41,8 @@ def cli():
     p_portfolio.add_argument('--type', help="which type of portfolio to build", type=str, default='100long', choices= ["100long", "longshort", "130-30"])
     p_portfolio.add_argument('--pertop', help="Percentage top portfolio used", type=percentage, default=10)
     p_portfolio.add_argument('--perbot', help="Percentage bottom portfolio used", type=percentage, default=10)
+    p_portfolio.add_argument("-np", "--noPlots", action="store_true", help="Don't do plotting")
+
 
     for sp in (p_info, p_sentiment, p_funda, p_anal, p_train, p_portfolio):
         sp.add_argument("--test", action="store_true", help="Run on test subset (~50)")
@@ -52,6 +54,6 @@ def cli():
                          help="Explicitly include sentimental data in training features", action="store_true")      
         sp.add_argument('--use-enhanced', action='store_true', help='Include enhanced features (ranks, interactions, reversal)')
         sp.add_argument("--ticker", help="chose ml to display", type=list_from_string, default=None)
-        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb", "ensemble"])
+        sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb", "ensemble", "lgbm", "xgb"])
 
     return parser

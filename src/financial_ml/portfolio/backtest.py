@@ -17,7 +17,7 @@ from financial_ml.portfolio.diagnostics import(
     analyze_sector_concentration,
     compare_drawdowns_to_spy,
     compare_model_performance_by_period,
-    print_model_agreement,
+    analyze_model_agreement,
     test_sharpe_significance,
     test_random_baseline
     )
@@ -52,7 +52,8 @@ def validate_and_select_models(preds, requested_model):
     print("\n" + "="* SEPARATOR_WIDTH)
     print(f"Available models: {', '.join(available_models)}")
     print(f"Requested model: {requested_model}")
-    
+    if requested_model not in available_models and 'ensemble' not in requested_model:
+        raise ValueError(f"Model {requested_model} is not on the list {available_models}")
     return available_models
 
 
@@ -74,6 +75,9 @@ def run_backtest(args, per_top=10, per_bot=10):
     preds = pd.read_csv(preds_nm)
     comparison_models = validate_and_select_models(preds=preds, requested_model=args.model)
     n_models = len(comparison_models)
+    save_plot = False if args.noPlots else True
+    fig_dir = get_dir(args, 'figure')
+
     if 'ensemble' in args.model:
         # Create ensemble predictions by averaging LogReg_L2 + RF_cal
         logreg_preds = preds[preds['model'] == 'logreg_l2'][['date', 'ticker', 'y_prob', 'y_true']].copy()
@@ -81,7 +85,7 @@ def run_backtest(args, per_top=10, per_bot=10):
         
         # Merge and average
         ensemble = logreg_preds.merge(rf_preds, on=['date', 'ticker'], suffixes=('_lr', '_rf'))
-        ensemble['y_prob'] = 0.5 * ensemble['y_prob_lr'] + 0.5 * ensemble['y_prob_rf']
+        ensemble['y_prob'] = 0.46 * ensemble['y_prob_lr'] + 0.56 * ensemble['y_prob_rf']
         ensemble['y_true'] = ensemble['y_true_lr']  # Same labels
         ensemble['model'] = 'ensemble_A'
         ensemble = ensemble[['date', 'ticker', 'y_prob', 'y_true', 'model']]
@@ -108,7 +112,7 @@ def run_backtest(args, per_top=10, per_bot=10):
 
 
     if n_models>2:
-        print_model_agreement(df, models)
+        analyze_model_agreement(df, models, save_plot=save_plot, fig_dir=fig_dir)
         compare_model_performance_by_period(preds, returns_realized, models=comparison_models)#['logreg_l2', model])
     else:
         print("\n" + "*"* SEPARATOR_WIDTH)
@@ -162,7 +166,6 @@ def run_backtest(args, per_top=10, per_bot=10):
     turnover = analyze_turnover(df) #turnover analysis
     analyze_sector_concentration(df)
 
-    fig_dir = get_dir(args, 'figure')
     sector_drift = plot_sector_concentration_over_time(df, fig_dir=fig_dir)
     #analyze_sector_concentration_old(df, pred_col) 
 
@@ -188,7 +191,7 @@ def run_backtest(args, per_top=10, per_bot=10):
 
 
 
-    analyze_beta_exposure(portfolio_returns, equal_weight_returns, random_returns)
+    analyze_beta_exposure(portfolio_returns, equal_weight_returns, random_returns, model)
     compare_drawdowns_to_spy(portfolio_returns, equal_weight_returns, random_returns)
 
     # Sharpe Ratio (annualized)

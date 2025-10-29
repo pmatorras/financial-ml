@@ -240,10 +240,11 @@ def train(args):
                     f"Test {te_start.date()} → {te_end.date()} | "
                     f"Test class counts {dict(zip(classes, counts))}"
                     )
-            print(f"[{name} | Fold {split_id}] "
-                  f"Train {tr_start.date()} → {tr_end.date()} | "
-                  f"Test {te_start.date()} → {te_end.date()} | "
-                    )
+            if args.verbose:
+                print(f"[{name} | Fold {split_id}] "
+                    f"Train {tr_start.date()} → {tr_end.date()} | "
+                    f"Test {te_start.date()} → {te_end.date()} | "
+                        )
             pipe.fit(Xtrain, Ytrain)
             p_train = pipe.predict_proba(Xtrain)[:,1]
             p_test = pipe.predict_proba(Xtest)[:,1]

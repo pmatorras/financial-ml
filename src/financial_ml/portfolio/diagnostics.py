@@ -15,7 +15,8 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from scipy.stats import spearmanr
 import itertools
-from financial_ml.utils.config import SP500_NAMES_FILE, SEPARATOR_WIDTH
+from financial_ml.utils.config import SP500_NAMES_FILE, SEPARATOR_WIDTH, FIGURE_DIR
+
 def pre_filter_diagnostics(df):
     '''Check for data leakage and duplicate predictions'''
     print("\n=== PRE-FILTER DIAGNOSTIC ===")
@@ -39,7 +40,7 @@ def pre_filter_diagnostics(df):
 
 
 
-def print_model_agreement(preds_df, models):
+def analyze_model_agreement(preds_df, models, save_plot=True, fig_dir=FIGURE_DIR):
     """Print model agreement analysis results"""
     
     print("\n" + "="* SEPARATOR_WIDTH)
@@ -48,7 +49,7 @@ def print_model_agreement(preds_df, models):
     print("Purpose: High correlation proves all models capture the same")
     print("         fundamental signal (not random overfitting)")
     
-    results = model_agreement_correlations(preds_df,models)
+    results = calculate_model_agreement_correlations(preds_df,models)
     
     print("\nPairwise Prediction Correlations (Spearman):")
     for pair, stats in results['correlations'].items():
@@ -72,9 +73,18 @@ def print_model_agreement(preds_df, models):
         print("     → High risk of overfitting")
         print("     → Results may not be robust")
     
+    # Generate and save correlation matrix plot
+    if save_plot:
+        try:
+            from financial_ml.portfolio.visualization import plot_correlation_matrix
+            plot_correlation_matrix(preds_df, models, fig_dir)
+            
+        except Exception as e:
+            print(f"\n⚠️  Could not generate correlation matrix plot: {e}")
+
     print("="* SEPARATOR_WIDTH)
 
-def model_agreement_correlations(preds_df, models_dict, print_results=True):
+def calculate_model_agreement_correlations(preds_df, models_dict, print_results=True):
     # Compare predictions from all 3 models
     models = list(models_dict.keys())
 
@@ -113,7 +123,7 @@ def model_agreement_correlations(preds_df, models_dict, print_results=True):
     }
 
 def compare_model_performance_by_period(preds_df, returns_df, models):
-    """Compare RF vs Logistic performance across time periods"""
+    """Compare Model performance across time periods"""
     
     # Merge predictions with returns
     df = preds_df.merge(returns_df, on=['date', 'ticker'], how='inner')
@@ -144,7 +154,6 @@ def compare_model_performance_by_period(preds_df, returns_df, models):
         
         for model in models:
             model_data = period_data[period_data['model'] == model]
-            
             # Calculate AUC (prediction quality)
             auc = roc_auc_score(model_data['y_true'], model_data['y_prob'])
             
@@ -291,7 +300,7 @@ def calculate_alpha_beta(df_returns, benchmark_returns, benchmark_nm, message):
         print(f"  ❌ No alpha: All returns from beta")
     print("-"* SEPARATOR_WIDTH)
 
-def analyze_beta_exposure(portfolio_returns, random_returns, equal_returns):
+def analyze_beta_exposure(portfolio_returns, random_returns, equal_returns, model=''):
     """
     Calculate alpha and beta against multiple benchmarks to understand return sources.
     
@@ -303,7 +312,7 @@ def analyze_beta_exposure(portfolio_returns, random_returns, equal_returns):
     from scipy.stats import linregress
     
     print("\n" + "="* SEPARATOR_WIDTH)
-    print("ALPHA & BETA ANALYSIS - Return Attribution")
+    print(f"ALPHA & BETA ANALYSIS - Return Attribution ({model})")
     print("="* SEPARATOR_WIDTH)
     
     print(f"\nRegression Results:")

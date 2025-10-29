@@ -22,18 +22,20 @@ def analyze_models(args):
         
     # Load all saved models
     trained_models = {}
-    model_keys = get_models().keys()
-    
+    if 'all' in args.model:
+        model_keys = get_models(args).keys()
+    else:
+        model_keys = [args.model]
     for model_name in model_keys:
         model_path = get_model_file(args, model_name)
         if model_path.exists():
             trained_models[model_name] = joblib.load(model_path)
             print(f"    Loaded {model_name}")
         else:
-            print(f"  ⚠️  {model_name} not found")
-    
+            print(f"  Warning: {model_name} not found")
+
     if not trained_models:
-        print("\n❌ No models could be loaded!")
+        print("\n No models could be loaded!")
         return 1
     
     # Load feature names
@@ -43,7 +45,7 @@ def analyze_models(args):
             input_keys = [line.strip() for line in f]
         print(f"  ✓ Loaded {len(input_keys)} feature names")
     else:
-        print("\n⚠️  Warning: feature_names.txt not found, using defaults")
+        print("\n  Warning: feature_names.txt not found, using defaults")
         from financial_ml.utils.config import MARKET_KEYS, FUNDA_KEYS
         input_keys = MARKET_KEYS + FUNDA_KEYS
     

@@ -1,11 +1,173 @@
 """
 Portfolio visualization functions.
 """
-
-import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from financial_ml.utils.config import FIGURE_DIR, SP500_NAMES_FILE, SEPARATOR_WIDTH
 from financial_ml.models import get_model_name
+from financial_ml.portfolio.diagnostics import calculate_model_agreement_correlations
+
+
+
+def plot_correlation_matrix(preds_df, models_dict, fig_dir=FIGURE_DIR):
+    """
+    Plot model prediction correlation heatmap
+    
+    Args:
+        preds_df: DataFrame with columns ['date', 'ticker', 'y_prob', 'model']
+        models_dict: Dict of model names (keys) to use
+        fig_dir: Directory to save figure
+    
+    Returns:
+        Path to saved figure
+    """
+    
+    # Get correlation data from diagnostics
+    results = calculate_model_agreement_correlations(preds_df, models_dict)
+    correlations = results['correlations']
+    
+    # Build correlation matrix
+    models = list(models_dict.keys())
+    n = len(models)
+    corr_matrix = np.ones((n, n))  # Diagonal = 1
+    
+    # Fill matrix (symmetric)
+    for i, model1 in enumerate(models):
+        for j, model2 in enumerate(models):
+            if i != j:
+                key1 = f"{model1}_vs_{model2}"
+                key2 = f"{model2}_vs_{model1}"
+                
+                if key1 in correlations:
+                    corr_matrix[i, j] = correlations[key1]['correlation']
+                elif key2 in correlations:
+                    corr_matrix[i, j] = correlations[key2]['correlation']
+    
+    # Create heatmap
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    sns.heatmap(corr_matrix,
+                annot=True,
+                fmt='.3f',
+                cmap='RdYlGn_r',  # Red (high) to Yellow to Green (low)
+                vmin=0, 
+                vmax=1,
+                xticklabels=models,
+                yticklabels=models,
+                cbar_kws={'label': 'Spearman Correlation'},
+                square=True,
+                linewidths=0.5,
+                linecolor='gray',
+                ax=ax)
+    
+    ax.set_title('Model Prediction Correlation Matrix', 
+                 fontsize=14, fontweight='bold', pad=20)
+    ax.set_xlabel('Model', fontsize=12)
+    ax.set_ylabel('Model', fontsize=12)
+    
+    # Rotate labels for better readability
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    
+    plt.tight_layout()
+    
+    # Save figure
+    output_path = fig_dir / 'model_correlation_matrix.png'
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"✅ Saved correlation matrix: {output_path}")
+
+    return output_path
+
+
+def plot_performance_vs_correlation(preds_df, models_dict, performance_dict, reference_model='rf', fig_dir=FIGURE_DIR):
+    """
+    Plot model performance vs correlation with reference model
+    
+    Args:
+        preds_df: DataFrame with predictions
+        models_dict: Dict of model names
+        performance_dict: Dict mapping model names to Sharpe ratios
+                         e.g., {'rf': 0.93, 'logreg_l2': 0.79, ...}
+        reference_model: Model to compare correlations against (default: 'rf')
+        fig_dir: Directory to save figure
+    
+    Returns:
+        Path to saved figure
+    """
+    
+    # Get correlation data
+    results = calculate_model_agreement_correlations(preds_df, models_dict)
+    correlations = results['correlations']
+    
+    # Extract correlations with reference model
+    ref_corr = {}
+    for model in models_dict.keys():
+        if model == reference_model:
+            ref_corr[model] = 1.0
+        else:
+            key1 = f"{reference_model}_vs_{model}"
+            key2 = f"{model}_vs_{reference_model}"
+            
+            if key1 in correlations:
+                ref_corr[model] = correlations[key1]['correlation']
+            elif key2 in correlations:
+                ref_corr[model] = correlations[key2]['correlation']
+    
+    # Create scatter plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    for model in models_dict.keys():
+        if model not in performance_dict or model not in ref_corr:
+            continue
+            
+        x = ref_corr[model]
+        y = performance_dict[model]
+        
+        if model == reference_model:
+            ax.scatter(x, y, s=300, c='green', marker='*', 
+                      label=f'{model} (Reference)', zorder=3, edgecolors='black')
+        else:
+            ax.scatter(x, y, s=150, alpha=0.7, edgecolors='black')
+            ax.annotate(model, (x, y), xytext=(5, 5), 
+                       textcoords='offset points', fontsize=10)
+    
+    # Reference lines
+    ref_sharpe = performance_dict.get(reference_model, 0.93)
+    ax.axhline(y=ref_sharpe, color='green', linestyle='--', alpha=0.3, 
+              label=f'{reference_model} Sharpe')
+    ax.axvline(x=0.5, color='red', linestyle='--', alpha=0.3,
+              label='Correlation threshold (0.5)')
+    
+    # Quadrant labels
+    ax.text(0.25, ref_sharpe + 0.02, 'Low corr,\nHigh perf', 
+            ha='center', fontsize=9, alpha=0.5, style='italic')
+    ax.text(0.75, ref_sharpe + 0.02, 'High corr,\nHigh perf', 
+            ha='center', fontsize=9, alpha=0.5, style='italic')
+    
+    ax.set_xlabel(f'Correlation with {reference_model}', fontsize=12)
+    ax.set_ylabel('Portfolio Sharpe Ratio', fontsize=12)
+    ax.set_title(f'Model Performance vs Correlation with Best Model ({reference_model})',
+                fontsize=14, fontweight='bold')
+    ax.legend(loc='best')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # Save figure
+    output_path = fig_dir / 'performance_vs_correlation.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"✅ Saved performance vs correlation plot: {output_path}")
+    
+    return output_path
+
 
 def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FILE, fig_dir=FIGURE_DIR):
     """
@@ -81,7 +243,7 @@ def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FI
         max_val = sector_stats.loc[sector, 'max']
         
         # Flag high volatility sectors
-        flag = "⚠️⚠️" if std > 10 else "⚠️" if std > 5 else ""
+        flag = "⚠️ ⚠️" if std > 10 else "⚠️" if std > 5 else ""
         print(f"{sector:<30} {mean:>7.1f}% {std:>7.1f}% {min_val:>7.1f}% {max_val:>7.1f}% {flag}")
     
     print("\n💡 Interpretation:")

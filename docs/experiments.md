@@ -71,21 +71,25 @@ CalibratedClassifierCV with isotonic regression (cv=3)
 ---
 
 ## Experiment 3: Ensemble Testing
-**Date:** October 23, 2025  
-**Goal:** Test if averaging LogReg + RF_cal improves performance
+**Date:** October 23, 2025 (initial), October 29, 2025 (updated)
+**Goal:** Test if averaging predictions from multiple models improves portfolio performance
 
 ### Hypothesis:
-Combining linear (LogReg) and non-linear (RF) models might capture complementary signals
+Combining linear (LogReg) and non-linear (RF) models might capture complementary signals, given that generally, ensembles work best when models make uncorrelated errors with similar performance.
 
 ### Correlation Analysis:
 - LogReg_L2 vs RF_cal: 0.556 (moderate correlation)
 - Expected: Low correlation (<0.5) needed for ensemble benefit
 
-### Ensemble Configuration:
+### Phase 1: Initial testing (October 23, 2025)
+
+#### Ensemble Configuration:
 - 50% LogReg_L2 + 50% RF_cal
 - Simple averaging of predicted probabilities
 
-### Results:
+**Model correlation:** 0.556 (moderate, higher than ideal <0.5)
+
+#### Results:
 
 | Metric | RF_cal (Best) | Ensemble | Change |
 |--------|---------------|----------|--------|
@@ -94,13 +98,144 @@ Combining linear (LogReg) and non-linear (RF) models might capture complementary
 | Max Drawdown | -21.5% | -22.2% |  Worse |
 | Volatility | 17.4% | 18.1% |  +0.7% |
 
-### Why It Failed:
-1. LogReg is weaker (AUC 0.558 vs RF_cal 0.557)
-2. Correlation too high (0.556) → not enough diversity
-3. Averaging diluted RF_cal's stronger signal
-4. LogReg's narrow predictions (std ~0.04) compressed RF_cal's better spread (0.059)
+### Phase 2: Retesting with VIX Features (October 29, 2025)
 
-### Decision: Reject ensemble. Use RF_cal alone.
+After adding VIX_percentile feature, Random Forest performance improved significantly (Sharpe 0.93). Retested ensembles to see if combining improved models helped.
+
+**Baseline individual performance (with VIX):**
+
+- Random Forest: Sharpe 0.93, return 20.2%, drawdown -22.9%
+- Random Forest Calibrated: Sharpe 0.92, return 20.2%, drawdown -23.0%
+- Logistic Regression L2: Sharpe 0.79, return 18.1%, drawdown -25.4%
+
+**Model correlations:**
+
+- logreg_l2 vs rf: 0.423 (moderate)
+- logreg_l2 vs rf_cal: 0.375 (moderate, lower than rf)
+- rf vs rf_cal: 0.773 (high)
+
+***
+
+#### Test 1: Logistic L2 + Random Forest
+
+**Configuration:** 50% logreg_l2 + 50% rf
+
+**Results:**
+
+- Sharpe: 0.83
+- Annual Return: 18.2%
+- Max Drawdown: -23.9%
+- Win Rate: 68.9%
+
+**Analysis:**
+
+- Worse than RF alone by 0.10 Sharpe (11% degradation)
+- Ensemble improved logreg (0.79 → 0.83) but degraded RF (0.93 → 0.83)
+- Net effect: Worse than using best model alone
+
+***
+
+#### Test 2: Logistic L2 + Random Forest Calibrated (with sentiments)
+
+**Configuration:** 50% logreg_l2 + 50% rf_cal
+
+**Results:**
+
+- Sharpe: 0.85
+- Annual Return: 18.6%
+- Max Drawdown: -23.0%
+- Win Rate: 66.0%
+
+**Analysis:**
+
+- Better than Test 1 (0.85 vs 0.83) due to slightly lower correlation (0.375 vs 0.423)
+- Still worse than rf_cal alone by 0.07 Sharpe (8% degradation)
+- Same pattern: Helps weak model, hurts strong model
+
+***
+
+### Complete Performance Ranking
+
+| Rank | Model/Ensemble | Sharpe | Type | Status |
+| :-- | :-- | :-- | :-- | :-- |
+| 1 | RF + VIX | 0.93 | Single model | Best |
+| 2 | RF_cal + VIX | 0.92 | Single model | Very good |
+| 3 | logreg + rf_cal | 0.85 | Ensemble | Worse than components |
+| 4 | logreg + rf | 0.83 | Ensemble | Worse than components |
+| 5 | logreg_l2 | 0.79 | Single model | Weak |
+
+Both ensembles worse than top 2 single models.
+
+***
+
+#### 1. Dominant Single Model
+
+Random Forest (0.93) outperforms other models by large margin:
+
+- vs rf_cal: +0.01 (1% better)
+- vs logreg: +0.14 (18% better)
+
+**Mathematical result:** Averaging 0.93 with 0.79 produces 0.86 at best (50/50 weighting). Actual result (0.83) is worse due to probability compression.
+
+#### 2. No Complementary Pairs
+
+**Best individual performers:**
+
+- rf (0.93) + rf_cal (0.92): High correlation (0.773), ensemble would be ~0.91-0.92
+- rf (0.93) + logreg (0.79): Moderate correlation (0.423), but large performance gap
+
+**Low correlation pairs:**
+
+- All involve weak models (boosting: 0.78-0.84, logreg: 0.79)
+- Diversity without quality doesn't help
+
+
+#### 3. Probability Compression
+
+Averaging predictions compresses probability distributions:
+
+**Example with top 10% selection:**
+
+- RF alone: Stock A = 0.64, Stock B = 0.62 (clear differentiation)
+- Logreg: Stock A = 0.54, Stock B = 0.56 (less clear)
+- Ensemble: Stock A = 0.59, Stock B = 0.59 (no differentiation)
+
+Compression makes stock selection more random, hurting portfolio construction.
+
+#### 4. Optimal Weighting Analysis
+
+Performance-based optimal weights:
+
+```
+w_rf = 0.93 / (0.93 + 0.79) = 0.54
+w_logreg = 0.46
+```
+
+Even with optimal 54/46 weighting (vs 50/50 tested), expected Sharpe would be approximately 0.84, still worse than RF alone (0.93).
+
+To match RF performance, would need 90% RF + 10% logreg, at which point ensemble provides no benefit.
+
+***
+
+### Alternative Configurations Not Tested
+
+**RF + RF_cal ensemble:**
+
+- High correlation (0.773): Expected Sharpe 0.91-0.92
+- Marginal improvement over using single model
+- Not worth added complexity
+
+**Three-model ensembles:**
+
+- Even more probability compression
+- Expected Sharpe: 0.80-0.85 (worse than two-model)
+
+**Including boosting models:**
+
+- All boosting models weak (Sharpe 0.78-0.84)
+- Would drag ensemble down further
+
+### Decision: Reject ensemble. Use RF alone.
 
 ### Key Learning:
 Ensembles work when models have similar performance and low correlation (<0.5). When one model is clearly superior, averaging with weaker models hurts performance.
@@ -308,6 +443,48 @@ rf_cal + VIX:  [0.277, 0.823] range = 0.546 (stretched back out)
 **Why Calibration Fails:**
 Calibration stretches probabilities based on **average frequencies**, but VIX creates **regime-dependent distributions**. The stretched probabilities don't correlate with regime-specific returns, making selections worse than random.
 
+### Feature Importance Analysis
+
+Despite improving portfolio performance, VIX_percentile ranks last in feature importance:
+
+
+| Feature | Importance | Rank |
+| :-- | :-- | :-- |
+| vol12 | 25.8% | 1 |
+| BookToMarket | 23.6% | 2 |
+| ROA | 13.3% | 3 |
+| NetMargin | 8.6% | 4 |
+| ROE | 7.2% | 5 |
+| ... | ... | ... |
+| r1 | 0.32% | 12 |
+| **VIX_percentile** | **0.23%** | **13** |
+
+**Portfolio performance:**
+
+- Without VIX: Sharpe 0.92, AUC 0.519
+- With VIX: Sharpe 0.93, AUC 0.525
+
+
+### Why Low Importance Does Not Mean Low Value
+
+**Feature importance measures average contribution** across all samples (all market conditions). VIX_percentile works differently:
+
+**Usage pattern:**
+
+- Normal markets (85% of time): Inactive, other features dominate
+- High-volatility regimes (15% of time): Critical for stock selection
+- Result: Low average importance but high marginal value
+> A bit like the seatbelt of a car, unecessary in normal driving conditions, but important in accidents.
+
+**Mechanism:**
+
+- High-VIX periods: Growth/momentum stocks underperform
+- VIX_percentile enables regime-aware selection
+- Prevents catastrophic picks during market stress periods
+- Acts as "portfolio insurance" rather than primary signal
+
+
+
 ***
 
 ## Experiment 7: Random Forest Hyperparameter Optimization
@@ -469,98 +646,347 @@ Subsampling helps when:
 
 ***
 
+
+## Experiment 8: Gradient Boosting Model Comparison
+
+**Date:** October 28, 2025
+
+**Goal:** Test if gradient boosting methods (XGBoost, LightGBM, sklearn GradientBoosting) can outperform Random Forest for stock selection
+
+### Motivation
+
+Random Forest uses bagging (parallel tree training with bootstrap sampling). Gradient boosting methods build trees sequentially, with each tree correcting errors of previous trees. This sequential learning can sometimes outperform bagging in many ML tasks. We tested whether boosting could improve our weak-signal stock prediction problem (test AUC around 0.52).
+
+### Baseline Performance (Random Forest)
+
+```python
+RandomForestClassifier(
+    n_estimators=50,
+    max_depth=3,
+    max_features='log2',
+    max_samples=None,
+    min_samples_split=0.02,
+    min_samples_leaf=0.01,
+    class_weight="balanced"
+)
+```
+
+**Results:**
+
+- Test AUC: 0.525
+- Train AUC: 0.587
+- Train-test gap: 0.062
+- Portfolio Sharpe: 0.93
+- Alpha vs Random: 1.72%
+- Probability range: [0.429, 0.643] = 0.214
+
+***
+
+### Boosting Variant 1: XGBoost (Initial)
+
+**Configuration:**
+
+```python
+XGBClassifier(
+    n_estimators=100,
+    max_depth=3,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.4,
+    reg_alpha=0.1,
+    reg_lambda=1.0,
+    scale_pos_weight=1
+)
+```
+
+**Results:**
+
+
+| Metric | Value | vs RF |
+| :-- | :-- | :-- |
+| Test AUC | 0.527 | +0.002 |
+| Train AUC | 0.612 | +0.025 |
+| Train-test gap | 0.085 | +0.023 (hint of overfitting) |
+
+**Finding:** Better test AUC but much higher train-test gap. Model seems to be overfitting despite weak signal.
+
+***
+
+### Boosting Variant 2: LightGBM (Initial)
+
+**Configuration:**
+
+```python
+LGBMClassifier(
+    n_estimators=100,
+    max_depth=3,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.4,
+    reg_alpha=0.1,
+    reg_lambda=1.0,
+    num_leaves=8,
+    min_child_samples=50,
+    class_weight='balanced'
+)
+```
+
+**Results:**
+
+
+| Metric | Value | vs RF |
+| :-- | :-- | :-- |
+| Test AUC | 0.522 | -0.003 |
+| Train AUC | 0.610 | +0.023 |
+| Train-test gap | 0.088 | +0.026 (overfitting) |
+
+**Finding:** Worse test AUC and even more overfitting than XGBoost. Leaf-wise growth too aggressive for weak signal.
+
+***
+
+### Iteration 2: Increased Regularization
+
+Applied stronger regularization to control overfitting:
+
+**XGBoost (Regularized):**
+
+```python
+learning_rate=0.01,  # Reduced from 0.05
+reg_alpha=0.5,       # Increased from 0.1
+reg_lambda=2.0,      # Increased from 1.0
+```
+
+**Results:**
+
+
+| Metric | Before | After | Change |
+| :-- | :-- | :-- | :-- |
+| Test AUC | 0.527 | 0.524 | -0.003 |
+| Train AUC | 0.612 | 0.594 | -0.018 |
+| Gap | 0.085 | 0.070 | -0.015 (better) |
+
+**LightGBM (Regularized):**
+
+```python
+learning_rate=0.01,
+reg_alpha=0.5,
+reg_lambda=2.0,
+min_child_samples=100
+```
+
+**Results:**
+
+
+| Metric | Before | After | Change |
+| :-- | :-- | :-- | :-- |
+| Test AUC | 0.522 | 0.526 | +0.004 |
+| Train AUC | 0.610 | 0.594 | -0.016 |
+| Gap | 0.088 | 0.068 | -0.020 (better) |
+
+**Finding:** Regularization successfully reduced overfitting. Test AUC now competitive with RF.
+
+***
+
+### Boosting Variant 3: sklearn GradientBoosting
+
+**Configuration:**
+
+```python
+GradientBoostingClassifier(
+    n_estimators=50,
+    max_depth=3,
+    learning_rate=0.01,
+    subsample=0.5,              # More aggressive than XGBoost/LightGBM
+    validation_fraction=0.2,    # Built-in validation
+    n_iter_no_change=10         # Early stopping
+)
+```
+
+**Results:**
+
+
+| Metric | Value | vs RF |
+| :-- | :-- | :-- |
+| Test AUC | 0.526 | +0.001 |
+| Train AUC | 0.591 | +0.004 |
+| Train-test gap | 0.065 | +0.003 |
+| Test Std | 0.016 | +0.005 (more variance) |
+
+**Finding:** Best boosting variant. Early stopping and aggressive subsampling (0.5) prevented overfitting. But higher variance than RF.
+
+***
+
+## Portfolio Performance Comparison
+
+Despite similar test AUC, portfolio performance revealed large differences:
+
+
+| Model | Test AUC | Train Gap | Alpha vs Random | Portfolio Sharpe | Prob Range |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| **Random Forest** | 0.525 | 0.062 | **1.72%** | **0.93** | 0.214 |
+| XGBoost | 0.524 | 0.070 | 0.41% | ~0.80 | 0.111 |
+| LightGBM | **0.526** | 0.068 | **0.20%** | ~0.78 | 0.111 |
+| GradientBoosting | 0.526 | 0.065 | 0.80% | ~0.84 | Unknown |
+
+### Critical Finding: Probability Compression
+
+**Random Forest:**
+
+- Min: 0.429, Max: 0.643
+- Range: 0.214
+- Top 10% spread: ~0.05 (strong conviction)
+
+**XGBoost:**
+
+- Min: 0.493, Max: 0.604
+- Range: 0.111 (48% smaller than RF)
+- Top 10% spread: ~0.015 (weak conviction)
+
+**LightGBM:**
+
+- Min: 0.467, Max: 0.578
+- Range: 0.111 (48% smaller than RF)
+- Mean: 0.502 (almost exactly 0.50, indicating near-random predictions)
+- Top 10% spread: ~0.02 (very weak conviction)
+
+**Explanation:** Boosting models compressed probabilities toward 0.50 despite heavy regularization. With top 10% portfolio selection, weak conviction at extremes resulted in nearly random stock picking.
+
+***
+
+## Model Correlation Analysis
+
+Spearman correlation between model predictions:
+
+```
+rf vs xgb:   0.576  (moderate - different patterns)
+rf vs lgbm:  0.911  (high - similar but noisier)
+rf vs gb:    ~0.633  (moderate)
+xgb vs lgbm: 0.591  (moderate)
+```
+
+**Interpretation:**
+
+- LightGBM highly correlated with RF (0.911) but performs much worse. Making similar picks with less confidence.
+- XGBoost learning different patterns (0.576) but those patterns don't translate to returns.
+- None of the boosting models discovered new alpha.
+
+***
+
+## Why Boosting Failed
+
+### 1. Weak Signal + Sequential Learning = Noise Amplification
+
+With test AUC around 0.52 (barely above random 0.50):
+
+- Signal-to-noise ratio is extremely low
+- Sequential learning: Each tree corrects "errors" of previous trees
+- But "errors" are mostly noise, not signal
+- Boosting chases noise patterns
+
+**Random Forest advantage:** Independent trees average out noise, signal accumulates.
+
+### 2. Regularization Paradox
+
+To prevent overfitting, we added heavy regularization:
+
+- Very low learning rate (0.01)
+- Strong L1/L2 penalties (reg_alpha=0.5, reg_lambda=2.0)
+- Large minimum samples per leaf
+
+**Result:**
+
+- Train-test gap improved (goal achieved)
+- But probabilities compressed toward 0.50 (unintended consequence)
+- Model became overly cautious, losing conviction in winners
+
+
+### 3. Portfolio Selection at Extremes
+
+Top 10% strategy requires strong conviction at extremes (90th percentile and above):
+
+- RF: Top 10% ranges from 0.59 to 0.64 (clear separation)
+- Boosting: Top 10% ranges from 0.56 to 0.60 (minimal separation)
+
+With compressed probabilities, boosting models can't distinguish true winners from lucky stocks.
+
+### 4. Early Stopping Helps But Not Enough
+
+sklearn GradientBoosting with early stopping performed better than XGBoost/LightGBM:
+
+- Alpha: 0.80% vs 0.20-0.41%
+- Gap: 0.065 vs 0.068-0.070
+
+But still far behind RF (1.72% alpha). The fundamental issue remains: sequential learning amplifies noise in weak-signal regimes.
+
+***
+
+## Attempted Solutions (All Failed)
+
+1. **Stronger regularization:** Controlled overfitting but compressed probabilities
+2. **Early stopping:** Helped but insufficient
+3. **Aggressive subsampling (0.5):** Created diversity but still worse than RF's bagging
+4. **Different learning rates:** 0.01-0.05 tested, all suboptimal
+5. **Feature scaling (StandardScaler):** Marginal test AUC improvement, worse portfolio performance
+
+***
+
 ## Key Learnings
 
-### 1. **Feature Engineering Can Hurt Random Forests**
+### 1. Weak Signals Favor Bagging Over Boosting
 
-| Approach | Test AUC | Portfolio Sharpe | Interpretation |
-| :-- | :-- | :-- | :-- |
-| Engineered interactions | 0.527 | 0.86 | Forced functional form hurts |
-| Simple feature | 0.526 | **0.93** | RF learns optimal interactions  |
+Contrary to typical ML wisdom where "boosting > bagging", this breaks down at AUC < 0.55:
 
-**Lesson:** With Random Forests, **simple features > complex interactions**. The tree structure naturally discovers non-linear relationships without manual engineering.
-
-### 2. **AUC ≠ Portfolio Performance**
-
-All three VIX approaches improved test AUC:
-
-- With interactions: +0.008 AUC, but -0.06 Sharpe
-- VIX only: +0.007  AUC, **+0.01 Sharpe** 
-- Calibrated: Better AUC, but -0.69% alpha (loses to random!)
-
-**AUC measures ranking across all thresholds**, but portfolios select **only the top 10%**. Performance at extremes matters more than average ranking.
-
-### 3. **Probability Compression is a Red Flag**
-
-| Configuration | Prob Range | Portfolio Alpha |
-| :-- | :-- | :-- |
-| Baseline | 0.561 | 1.70%  |
-| VIX only | 0.214 | 1.72%  |
-| VIX interactions | 0.235 | 0.44%  |
-
-**VIX only** compresses probabilities but still works because:
-
-- Compression is **moderate** (not extreme)
-- **Ranking within compressed range** still informative
-- RF maintains enough spread for top 10% selection
-
-**VIX interactions** compress too much:
-
-- Model becomes overly cautious
-- Less conviction in winners
-- Top 10% threshold too close to median
+- Bagging's randomness provides natural regularization
+- Sequential learning in boosting amplifies noise
+- RF's parallel trees are optimal for low signal-to-noise ratios
 
 
-### 4. **Calibration Requires Careful Consideration**
+### 2. Test AUC is Misleading for Portfolio Construction
 
-Calibration helped baseline model (0.92 Sharpe), but **destroyed VIX model** (0.79 Sharpe).
+LightGBM achieved highest test AUC (0.526) but worst portfolio alpha (0.20%):
 
-**When calibration fails:**
+- AUC measures ranking quality across all thresholds
+- Portfolio selection happens at single extreme threshold (top 10%)
+- Performance at extremes matters more than average ranking
 
-- Features create **regime-dependent distributions**
-- Average calibration curve doesn't apply to all regimes
-- Stretched probabilities mislead portfolio selection
 
-**Lesson:** Calibration assumes **single stable distribution**. With regime features (VIX), this assumption breaks.
+### 3. Probability Spread Matters More Than Point Estimates
 
-### 5. **Regime Features Should Be Simple**
+Models with similar AUC but different probability spreads:
 
-**What worked:**
+- RF (range 0.214): 1.72% alpha
+- Boosting (range 0.111): 0.20-0.80% alpha
 
-- `VIX_percentile`: Binary question ("high or low volatility?")
-- Single value per time period
-- Let model decide how it matters
+Wider spread indicates stronger conviction in predictions, critical for portfolio construction.
 
-**What failed:**
+### 4. Model Correlation Reveals Information
 
-- Multiplicative interactions (`mom121 × VIX`)
-- Forced assumptions about functional form
-- Over-regularization
+High RF-LightGBM correlation (0.911) with worse performance indicates LightGBM is adding noise to RF's signal, not discovering new patterns. Low correlation would suggest complementary information and potential for ensembling.
 
-**Principle:** Regime features should **flag conditions**, not **modify features directly**.
+***
 
-### 6. **Random Baseline Test is Critical**
+## Final Comparison: Complete Results
 
-| Model | Alpha vs Random | Usable? |
-| :-- | :-- | :-- |
-| VIX only | 1.72% |  YES |
-| VIX interactions | 0.44% |  Marginal |
-| rf_cal + VIX | -0.69% |  NO |
+| Model | Test AUC | Train Gap | Alpha vs Random | Sharpe | Prob Range | Training Time | Verdict |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| **RF + VIX** | 0.525 | 0.062 | **1.72%** | **0.93** | 0.214 | Fast | **OPTIMAL** |
+| rf_cal | 0.519 | 0.064 | 1.70% | 0.92 | 0.56 | Fast | Good alternative |
+| GB | 0.526 | 0.065 | 0.80% | ~0.84 | Unknown | Medium | Not worth it |
+| XGBoost | 0.524 | 0.070 | 0.41% | ~0.80 | 0.111 | Medium | Failed |
+| LightGBM | 0.526 | 0.068 | 0.20% | ~0.78 | 0.111 | Fast | Failed |
 
-Without random baseline testing, we might have shipped a model that **loses to random stock picking**!
 
 ***
 
 ## Conclusion
 
-**Final model: rf with VIX_percentile only**
+Random Forest remains the optimal model for weak-signal stock prediction. Extensive testing of gradient boosting alternatives (XGBoost, LightGBM, sklearn GradientBoosting) revealed:
 
-Achieved:
+- Similar or slightly better test AUC
+- Much worse portfolio performance (54-88% worse alpha)
+- Fundamental incompatibility between sequential learning and weak signals
+- Probability compression destroys portfolio construction
 
--  Best Sharpe of all tested models (0.93)
--  Improved test AUC (+0.007)
--  Maintained portfolio returns (20.2%)
--  Better downside protection
--  Significant alpha vs random (1.72%)
+**Decision:** Use Random Forest with VIX_percentile feature for production. Boosting is not suitable for this problem.
 
-**Key insight:** Simple features + powerful model (Random Forest) > Complex feature engineering. Let the algorithm discover interactions rather than imposing them.
+***
