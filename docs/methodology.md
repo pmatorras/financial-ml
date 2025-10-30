@@ -5,16 +5,17 @@ Detailed documentation of the technical approach used in this project.
 ---
 ## Table of Contents
 
-- [Project structure](#project-structure)
+- [Project Structure](#project-structure)
+    - [Repository Layout](#repository-layout)
     - [Source Code](#source-code)
     - [Generated Directories](#generated-directories)
-    - [Module overview](#module-overview)
+    - [Module Overview](#module-overview)
 - [Data Pipeline](#data-pipeline)
     - [Universe](#universe)
     - [Data Sources](#data-sources)
     - [Data Quality](#data-quality)
 - [Feature Engineering](#feature-engineering)
-    - [Discriminating variables](#discriminating-variables)
+    - [Discriminating Variables](#discriminating-variables)
     - [Feature Scaling](#feature-scaling)
 - [Target Variable](#target-variable)
     - [Definition](#definition)
@@ -28,8 +29,7 @@ Detailed documentation of the technical approach used in this project.
     - [Calibration: Isotonic Regression](#calibration-isotonic-regression)
 - [Portfolio Construction](#portfolio-construction)
     - [Signal Generation](#signal-generation)
-    - [Position Assignment](#position-assignment)
-    - [Weighting](#weighting)
+    - [Portfolio Assignment](#portfolio-assignment)
     - [Rebalancing](#rebalancing)
 - [Performance Attribution](#performance-attribution)
     - [Risk-Adjusted Returns](#risk-adjusted-returns)
@@ -39,10 +39,6 @@ Detailed documentation of the technical approach used in this project.
     - [Drawdown Analysis](#drawdown-analysis)
     - [Regime Analysis](#regime-analysis)
     - [Position Limits](#position-limits)
-- [Transaction Cost Modeling](#transaction-cost-modeling)
-    - [Cost Assumptions](#cost-assumptions)
-    - [Annual Drag Calculation](#annual-drag-calculation)
-    - [Net Alpha](#net-alpha)
 - [Production Considerations](#production-considerations)
     - [Data Latency](#data-latency)
     - [Execution](#execution)
@@ -52,8 +48,8 @@ Detailed documentation of the technical approach used in this project.
     - [Market Impact](#market-impact)
     - [Regime Dependency](#regime-dependency)
     - [Factor Crowding](#factor-crowding)
+    - [Long-Only Constraints](#long-only-constraints)
 - [Future Improvements](#future-improvements)
-
 
 ## Project structure
 
@@ -193,6 +189,42 @@ This structure keeps the logic compartmentalized:
 - `cli/` directory aligns with the earlier design’s modular entrypoint for reproducible workflows (market, fundamentals, train, plot...).
 
 This makes the repository scalable for predictive modeling, portfolio backtesting, and visualization, while keeping all paths consistent with professional ML deployment standards
+
+#### Output File Details
+**Data Files**
+
+| File | Description | 
+| :-- | :-- | 
+| `data/sp500_list.csv` | S\&P 500 constituent tickers | 
+| `data/sp500_prices.csv` | Monthly adjusted close prices | 
+| `data/sentiment.csv` | Sentiment data | 
+| `data/sp500_fundamentals.csv` | Company fundamentals from SEC | 
+
+**Model Artifacts**
+
+| File | Description |
+|------|-------------|
+| `models/rf.pkl` | Trained Random Forest model (joblib) |
+| `models/feature_names.txt` | List of features used in training |
+| `models/training_summary.txt` | Training metrics and performance summary |
+
+**Prediction Files**
+| File | Description |
+| :-- | :-- |
+| `data/predictions/production/predictions_{model}.csv` | Out-of-fold predictions with probabilities |
+| `models/production/{model}.pkl` | Trained model artifacts (serialized with joblib) |
+| `models/production/feature_names.txt` | List of features used in training |
+| `models/production/training_summary.txt` | Summary of training AUC for each fold and each model, as well as list of training features |
+**Visualizations:**
+
+| File | Description |
+|------|-------------|
+| `importance_{model}.png` | Feature importance for a treee mdoel |
+| `coefficients_logreg_{l1,l2}.png` | LogReg coefficient magnitudes |
+| `portfolio_performance_{model}_{portfolio_type}_{per_top}.png` | Cumulative portfolio returns vs SPY for a given model, portfolio type, and percentage of top stocks|
+| `model_correlation_matrix.png` | Correlation between all model predictions |
+| `sector_drift_{model}.png` | Sector allocation over time vs SPY benchmark |
+
 ***
 ### Module overview
 ### CLI Module 
@@ -776,7 +808,7 @@ Despite its simpler implementation and no short borrowing costs, tthe decision o
     - **Challenge:** Different accounting standards, data availability
     - **Benefit:** Test if signals generalize across regions
     - This could be implemented either via country-specific models or through a unified multi-region approach
-    
+
 4. Improve the **Risk Management**
     - Implement max sector exposure limits
     - Add volatility targeting (scale positions by risk)

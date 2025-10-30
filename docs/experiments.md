@@ -11,6 +11,7 @@ This document tracks all model experiments and design choices throughout the pro
 - [Experiment 5: Feature Engineering](#experiment-5-feature-engineering)
 - [Experiment 6: VIX sentiment features](#experiment-6-vix-sentiment-features)
 - [Experiment 7: Random forest hyperparameter optimisation](#experiment-7-random-forest-hyperparameter-optimization)
+- [Experiment 8: Gradient boosting model comparison](#experiment-8-gradient-boosting-model-comparison)
 - [Summary of Final Configuration](#summary-of-final-configuration)
 
 
@@ -990,3 +991,4 @@ Random Forest remains the optimal model for weak-signal stock prediction. Extens
 **Decision:** Use Random Forest with VIX_percentile feature for production. Boosting is not suitable for this problem.
 
 ***
+[**Back to top**](#experiment-log)

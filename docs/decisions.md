@@ -949,3 +949,6 @@ This covers the primary approaches for tabular classification. Additional archit
 3. Offer minimal expected improvement over current solution
 
 **Conclusion:** Model architecture exploration completed. Further performance gains should come from feature engineering, portfolio optimization, or data quality improvements, not trying additional model types.
+
+***
+[**Back to top**](#design-decisions-and-rationale)

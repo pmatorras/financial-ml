@@ -15,6 +15,19 @@ Built a machine learning pipeline to predict monthly S&P 500 stock returns using
 > Simple models (Random Forest) were found to outperform complex methods (gradient boosting) by 18% in weak-signal regimes. Test AUC poorly predicts portfolio performance; probability distribution and regime awareness matter more.
 
 ---
+## Table of Contents
+
+- [Final Model Configuration](#final-model-configuration)
+- [Performance Metrics](#performance-metrics)
+- [Visualisations](#visualisations)
+- [Model Comparison](#model-comparison)
+- [Feature Engineering Experiments](#feature-engineering-experiments)
+- [Why Random Forest Won](#why-random-forest-won)
+- [Limitations and Future Work](#limitations-and-future-work)
+- [Reproducibility](#reproducibility)
+- [Key Takeaways](#key-takeaways)
+
+---
 
 ## Final Model Configuration
 
@@ -104,7 +117,7 @@ random_state=42
 | Metric | Train | Test | Interpretation |
 |--------|-------|------|----------------|
 | AUC | 0.587 | 0.525 | Weak but real signal |
-| Train-Test Gap | - | 0.062 | Healthy generalization |
+| Train-Test Gap | - | 0.062 | Healthy generalisation |
 | Cross-Val Std | - | 0.011 | Stable across regimes |
 
 ### Alpha Decomposition
@@ -121,9 +134,9 @@ Risk-adjusted excess returns relative to benchmarks:
 
 ---
 
-## Visualizations
+## Visualisations
 
-### Portfolio Performance
+### Portfolio Performance visualisation
 
 ![Portfolio Performance](images/portfolio_performance.png)
 
@@ -193,7 +206,7 @@ LightGBM achieved highest test AUC (0.526) but worst portfolio alpha (0.20%). Ra
 **Why this happens:**
 - AUC measures ranking across all probability thresholds
 - Portfolio construction selects top 10% only (single extreme threshold)
-- Boosting models compress probabilities toward 0.50 due to heavy regularization
+- Boosting models compress probabilities toward 0.50 due to heavy regularisation
 - RF maintains wider probability spread (0.43-0.64 vs 0.47-0.58 for boosting)
 - At extremes, small probability differences matter greatly
 
@@ -230,7 +243,7 @@ With test AUC 0.525 (only 2.5% above random), signal-to-noise ratio is extremely
 **Gradient Boosting:**
 - Sequential learning
 - Chases noise in weak-signal regime
-- Heavy regularization compresses probabilities
+- Heavy regularisation compresses probabilities
 - Probability spread: 0.111 (too narrow)
 
 ### 2. Simple Beats Complex
@@ -277,7 +290,7 @@ Cross-validation standard deviation:
 - Include pre EDGAR fundamentals to cover 2008 financial crisis
 - Regime-specific models (high-VIX vs low-VIX trained separately)
 - Dynamic feature selection based on market conditions
-- Alternative portfolio construction (mean-variance optimization, risk parity)
+- Alternative portfolio construction (mean-variance optimisation, risk parity)
 
 **Data quality:**
 - Fix survivorship bias (full S&P 500 historical membership)
