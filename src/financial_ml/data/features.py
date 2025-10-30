@@ -8,7 +8,7 @@ import numpy as np
 from pandas.tseries.offsets import BQuarterEnd
 
 from financial_ml.utils.helpers import safe_div
-from financial_ml.utils.config import DEBUG_DIR
+from financial_ml.utils.config import DEBUG_DIR, CLIP_MIN, CLIP_MAX
 from financial_ml.data.validation import require_non_empty
 
 
@@ -105,6 +105,81 @@ def calculate_market_features(prices,args):
         "vol3": vol_3m,
         "vol12": vol_12m
     }
+
+def calculate_sentiment_features(sentiment_data, mode='trim'):
+    """
+    Calculate sentiment-based features (VIX derivatives)
+    
+    Args:
+        sentiment_data: DataFrame from load_sentiment() with VIX column
+    
+    Returns:
+        dict of {feature_name: pd.Series} indexed by date
+    """
+    vix = sentiment_data['VIX']
+    # Percentile rank (regime indicator, bounded [0,1])
+    vix_percentile = vix.rolling(12, min_periods=3).rank(pct=True) #DATA is monthly
+    vix_dict = {}
+    vix_dict['VIX_percentile'] = vix_percentile
+    if 'all' in mode:
+        print("including all features")
+        vix_dict['VIX_log'] = np.log(vix)
+        vix_dict['VIX_change_1m'] = vix.pct_change(1)
+
+    return vix_dict
+
+def calculate_vix_interactions(market_features, sentiment_features, tickers):
+    """
+    Calculate VIX interaction features
+    
+    Philosophy: Market features (momentum, volatility) behave differently
+    in high-VIX vs low-VIX regimes. Interactions capture this explicitly.
+    
+    Args:
+        market_features: dict of {name: DataFrame} for market features
+        sentiment_features: dict of {name: Series} for sentiment features
+        tickers: list of stock tickers
+        
+    Returns:
+        dict of {interaction_name: DataFrame} with same shape as market_features
+    """
+    interactions = {}
+    
+    # Only create interactions if VIX_percentile exists
+    vix_pct = sentiment_features.get('VIX_percentile')
+    if vix_pct is None:
+        return interactions
+    
+    # Broadcast VIX to stock level
+    vix_broadcasted = broadcast_market_feature_to_stocks(vix_pct, tickers)
+    vix_clipped = vix_broadcasted.clip(CLIP_MIN, CLIP_MAX)
+
+    # Create interactions with key market features
+    if 'mom121' in market_features:
+        interactions['mom121_x_VIX'] = market_features['mom121'] * vix_clipped
+    
+    if 'vol12' in market_features:
+        interactions['vol12_x_VIX'] = market_features['vol12'] * vix_clipped
+    
+    return interactions
+
+
+def broadcast_market_feature_to_stocks(market_feature_series: pd.Series, tickers: list) -> pd.DataFrame:
+    """
+    Broadcast a market-wide feature (Series indexed by date)
+    into a DataFrame of shape (dates x tickers) by repeating values
+    
+    Args:
+        market_feature_series: pd.Series indexed by date
+        tickers: list of ticker strings
+    
+    Returns:
+        pd.DataFrame indexed by dates, columns=tickers
+    """
+    values = market_feature_series.values[:, None]  # (n_dates, 1)
+    data = np.repeat(values, len(tickers), axis=1)  # (n_dates, n_tickers)
+    df = pd.DataFrame(data, index=market_feature_series.index, columns=tickers)
+    return df
 
 def compute_log_mktcap(price: pd.Series, shares: pd.Series, name="LogMktCap") -> pd.Series:
     '''

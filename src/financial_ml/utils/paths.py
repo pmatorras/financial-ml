@@ -19,6 +19,12 @@ def get_market_file(args):
     print("opening", csv_filenm)
     return csv_filenm
 
+def get_sentiment_file(args):
+    """Get path to sentiment data CSV"""
+    data_dir = DATA_DIR
+    return data_dir / "sentiment.csv"
+    
+
 def get_fundamental_file(args):
     '''Get path to fundamental data file based on the run mode'''
     if args.debug: csv_filenm =SP500_FUNDA_DEBUG
@@ -27,11 +33,28 @@ def get_fundamental_file(args):
     print("opening", csv_filenm)
     return csv_filenm
 
-
+def get_fig_name(fig_type, model_name, ref_model='', p_type='', per_top=''):
+    fig_name = ''
+    if fig_type=='importance':
+        fig_name =  f"importance_{model_name.lower()}.png"
+    elif fig_type=='coefficients':
+        fig_name = f"coefficients_{model_name.lower()}.png"
+    elif fig_type=='correlation':
+        fig_name = 'model_correlation_matrix.png'
+    elif fig_type=='performance_vs_correlation':
+        fig_name = f'performance_vs_correlation_{model_name}_vs{ref_model}.png'
+    elif fig_type=='concentration':
+        fig_name = f'sector_drift_{model_name}.png'
+    elif fig_type=='performance':
+        fig_name = f"portfolio_performance_{model_name}_{p_type}_top{str(per_top)}.png"
+    else:
+        print("type of figure not regognised")
+        return -1
+    return fig_name
 
 def get_dir(args, dir_type):
     '''Function to determine which folder/subfolder to choose or create'''
-    if args.debug:
+    if hasattr(args, 'debug') and args.debug:
         file_dir = DEBUG_DIR
     elif 'data' in dir_type.lower():
         file_dir = DATA_DIR
@@ -42,6 +65,9 @@ def get_dir(args, dir_type):
     else:
         print("file_dir not generated, please check", args, dir_type)
         exit()
+    if hasattr(args, 'do_sentiment') and args.do_sentiment:
+        file_dir = file_dir / 'sentiment'
+        file_dir.mkdir(parents=True, exist_ok=True)
 
     if hasattr(args, 'only_market') and args.only_market:
         file_dir = file_dir / 'only_market'

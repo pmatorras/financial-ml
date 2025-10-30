@@ -5,10 +5,12 @@ Extracts and visualizes coefficients and feature importances.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from financial_ml.utils.config import FIGURE_DIR
+from financial_ml.utils.config import FIGURE_DIR, SEPARATOR_WIDTH
+from financial_ml.utils.paths import get_fig_name
+from sklearn.ensemble import RandomForestClassifier
 
 
-def plot_rf_feature_importance(model, feature_names, save_path=FIGURE_DIR / "feature_importance_rf.png"):
+def plot_tree_feature_importance(model, feature_names, save_path=FIGURE_DIR / "feature_importance_rf.png"):
     """
     Plot feature importance from trained Random Forest
     Args:
@@ -21,17 +23,23 @@ def plot_rf_feature_importance(model, feature_names, save_path=FIGURE_DIR / "fea
     """
     
     importances = model.feature_importances_
-    std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
-    
     importance_df = pd.DataFrame({
         'feature': feature_names,
         'importance': importances,
-        'std': std
-    }).sort_values('importance', ascending=True)
-    
+    })
+    if isinstance(model, RandomForestClassifier):
+        std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
+        importance_df['std'] = std
+
+    importance_df = importance_df.sort_values('importance', ascending=True)
+
     fig, ax = plt.subplots(figsize=(10, 8))
-    ax.barh(importance_df['feature'], importance_df['importance'], 
+    if 'std' in importance_df.columns:
+        ax.barh(importance_df['feature'], importance_df['importance'], 
             xerr=importance_df['std'], capsize=3)
+    else: 
+        ax.barh(importance_df['feature'], importance_df['importance'])
+
     ax.set_xlabel('Mean Decrease in Impurity', fontsize=12)
     ax.set_ylabel('Features', fontsize=12)
     ax.set_title('Random Forest Feature Importance', fontsize=14, fontweight='bold')
@@ -127,24 +135,19 @@ def analyze_feature_importance(models_dict, feature_names, fig_dir=FIGURE_DIR):
         # Now extract feature importance based on model type
         if hasattr(model, 'feature_importances_'):
             # Random Forest or tree-based model
-            print(f"\n{'='*60}")
+            print(f"\n{'='*SEPARATOR_WIDTH}")
             print(f"Feature Importance: {model_name}")
-            print(f"{'='*60}")
-            importance_df = plot_rf_feature_importance(
-                model, feature_names, 
-                save_path=fig_dir/ f"importance_{model_name.lower()}.png"
-            )
+            print(f"{'='*SEPARATOR_WIDTH}")
+            fig_name =get_fig_name('importance', model_name)
+            importance_df = plot_tree_feature_importance(model, feature_names, save_path=fig_dir / fig_name)
             print(importance_df.sort_values('importance', ascending=False).to_string(index=False))
-            
         elif hasattr(model, 'coef_'):
             # Logistic Regression or linear model
-            print(f"\n{'='*60}")
+            fig_name = get_fig_name('coefficients', model_name)
+            print(f"\n{'='*SEPARATOR_WIDTH}")
             print(f"Coefficients: {model_name}")
-            print(f"{'='*60}")
-            coef_df = plot_logistic_coefficients(
-                pipeline, feature_names,
-                save_path=fig_dir /f"coefficients_{model_name.lower()}.png"
-            )
+            print(f"{'='*SEPARATOR_WIDTH}")
+            coef_df = plot_logistic_coefficients( pipeline, feature_names, save_path=fig_dir / fig_name)
             print(coef_df.sort_values('abs_coefficient', ascending=False).to_string(index=False))
         else:
             print(f"\n{model_name}: Cannot extract feature importance (no coef_ or feature_importances_)")

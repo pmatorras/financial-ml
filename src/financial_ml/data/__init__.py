@@ -9,9 +9,10 @@ Main modules:
 
 # You can optionally expose key loaders here
 from financial_ml.data.validation import require_non_empty
-from financial_ml.data.loaders import load_market, load_fundamentals
+from financial_ml.data.loaders import load_market, load_fundamentals, load_sentiment
 from financial_ml.data.features import (
     calculate_market_features,
+    calculate_sentiment_features,
     compute_fundamental_ratios,
     create_binary_labels,
     to_monthly_ffill,
@@ -22,7 +23,9 @@ __all__ = [
     'require_non_empty',
     'load_market',
     'load_fundamentals',
+    'load_sentiment',
     'calculate_market_features',
+    'calculate_sentiment_features',
     'compute_fundamental_ratios', 
     'create_binary_labels',
     'to_monthly_ffill',

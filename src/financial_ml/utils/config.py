@@ -26,6 +26,8 @@ SP500_FUNDA_DEBUG = DEBUG_DIR / "sp500_fundamentals_debug.csv"
 #number of folds
 N_SPLITS = 3
 
+CLIP_MIN = 0.25
+CLIP_MAX = 0.75
 #Display formatting constants
 SEPARATOR_WIDTH = 70
 
@@ -39,7 +41,15 @@ MARKET_KEYS = [
     "r12", 
     "mom121",
     "vol3",
-    "vol12"]
+    "vol12"
+    ]
+
+SENTIMENT_KEYS = [
+    #'VIX_log', 
+    #'VIX_change_1m', 
+    'VIX_percentile'
+    ]
+
 FUNDA_KEYS  = [
     "BookToMarket",
     "ROE",

@@ -33,6 +33,10 @@ market:
 fundamentals:
 	python -m financial_ml fundamentals
 
+sentiment:
+	python -m financial_ml sentiment
+
+data: market, fundamentals, sentiment
 train:
 	python -m financial_ml train 
 
@@ -42,7 +46,29 @@ analyze:
 portfolio:
 	python -m financial_ml  portfolio
 
+backtest: analyze, portfolio
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
+optimise-depth:
+	python -m financial_ml train --do-sentiment --model rf --tree-depth 3
+	python -m financial_ml train --do-sentiment --model rf --tree-depth 4
+	python -m financial_ml train --do-sentiment --model rf --tree-depth 5
+
+optimise-max-features:
+	python -m financial_ml train --do-sentiment --model rf --tree-max-features log2
+	python -m financial_ml train --do-sentiment --model rf --tree-max-features sqrt
+	python -m financial_ml train --do-sentiment --model rf --tree-max-features 0.3
+	python -m financial_ml train --do-sentiment --model rf --tree-max-features 0.4
+
+optimise-nestimators:
+	python -m financial_ml train --do-sentiment --model rf --tree-nestimators 50
+	python -m financial_ml train --do-sentiment --model rf --tree-nestimators 100
+	python -m financial_ml train --do-sentiment --model rf --tree-nestimators 200
+
+optimise-maxsamples:
+	python -m financial_ml train --do-sentiment --model rf
+	python -m financial_ml train --do-sentiment --model rf --tree-max-samples 0.8
+	python -m financial_ml train --do-sentiment --model rf --tree-max-samples 0.9

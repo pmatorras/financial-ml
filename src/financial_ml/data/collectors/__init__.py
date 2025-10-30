@@ -13,9 +13,11 @@ Usage:
 """
 
 from financial_ml.data.collectors.market_data import collect_market_data
-from financial_ml.data.collectors.fundamental_data import collect_fundamentals
+from financial_ml.data.collectors.fundamental_data import collect_fundamentals_data
+from financial_ml.data.collectors.sentiment_data import collect_sentiment_data
 
 __all__ = [
     'collect_market_data',
-    'collect_fundamentals',
+    'collect_fundamentals_data',
+    'collect_sentiment_data'
 ]

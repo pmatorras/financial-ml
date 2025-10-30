@@ -409,7 +409,7 @@ def fetch_facts_latest_for_cik(cik, ticker, dict_facts, args):
 
 
 
-def collect_fundamentals(args):
+def collect_fundamentals_data(args):
     '''Retrieve sp500 information from markets.py, and obtain the fundamentals for these'''
     df_all = pd.read_csv(SP500_NAMES_FILE)
     df=filter_market_subset(df_all,args)

@@ -12,6 +12,8 @@ dependencies = [
   "requests",
   "pyarrow",
   "scikit-learn",
+  "xgboost", #additional models
+  "lightgbm", #additional models
 ]
 
 [project.scripts]

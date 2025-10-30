@@ -1,6 +1,6 @@
 """Main entry point for financial_ml CLI."""
 from financial_ml.cli.parser import cli
-from financial_ml.data.collectors import collect_market_data, collect_fundamentals
+from financial_ml.data.collectors import collect_market_data, collect_fundamentals_data, collect_sentiment_data
 from financial_ml.models import train
 from financial_ml.utils.paths import create_parent_folders
 from financial_ml.portfolio import run_backtest
@@ -19,7 +19,10 @@ def main(argv=None):
         collect_market_data(args)
     elif args.cmd == "fundamentals":
         print("Downloading fundamentals")
-        collect_fundamentals(args)
+        collect_fundamentals_data(args)
+    elif args.cmd == "sentiment":
+        print("Downloading fundamentals")
+        collect_sentiment_data(args)
     elif args.cmd == "train":
         print("Performing training")
         train(args)
