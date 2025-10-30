@@ -27,6 +27,7 @@ from financial_ml.portfolio.construction import construct_portfolio, smooth_pred
 
 # In backtest.py or diagnostics.py
 from financial_ml.utils.config import SEPARATOR_WIDTH
+from sklearn.metrics import roc_auc_score
 
 def validate_and_select_models(preds, requested_model):
     """
@@ -81,15 +82,18 @@ def run_backtest(args, per_top=10, per_bot=10):
     if 'ensemble' in args.model:
         # Create ensemble predictions by averaging LogReg_L2 + RF_cal
         logreg_preds = preds[preds['model'] == 'logreg_l2'][['date', 'ticker', 'y_prob', 'y_true']].copy()
-        rf_preds = preds[preds['model'] == 'rf_cal'][['date', 'ticker', 'y_prob', 'y_true']].copy()
+        model_2= 'rf_cal'
+        rf_preds = preds[preds['model'] == model_2][['date', 'ticker', 'y_prob', 'y_true']].copy()
         
         # Merge and average
-        ensemble = logreg_preds.merge(rf_preds, on=['date', 'ticker'], suffixes=('_lr', '_rf'))
-        ensemble['y_prob'] = 0.46 * ensemble['y_prob_lr'] + 0.56 * ensemble['y_prob_rf']
+        ensemble = logreg_preds.merge(rf_preds, on=['date', 'ticker'], suffixes=('_lr', f'_{model_2}'))
+        ensemble['y_prob'] = 0.5 * ensemble['y_prob_lr'] + 0.5 * ensemble[f'y_prob_{model_2}']
         ensemble['y_true'] = ensemble['y_true_lr']  # Same labels
         ensemble['model'] = 'ensemble_A'
         ensemble = ensemble[['date', 'ticker', 'y_prob', 'y_true', 'model']]
-        
+        # Calculate AUC for ensemble
+        ensemble_auc = roc_auc_score(ensemble['y_true'], ensemble['y_prob'])
+        print(f"Ensemble A (logreg_2 vs {model_2}) AUC: {ensemble_auc:.3f}")
         # Append ensemble to predictions
         preds = pd.concat([preds, ensemble], ignore_index=True)
         print(f"Added ensemble_A predictions: {len(ensemble)} rows")
@@ -166,7 +170,7 @@ def run_backtest(args, per_top=10, per_bot=10):
     turnover = analyze_turnover(df) #turnover analysis
     analyze_sector_concentration(df)
 
-    sector_drift = plot_sector_concentration_over_time(df, fig_dir=fig_dir)
+    sector_drift = plot_sector_concentration_over_time(df, fig_dir=fig_dir, model=model)
     #analyze_sector_concentration_old(df, pred_col) 
 
     # Calculate Portfolio Returns

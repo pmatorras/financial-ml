@@ -198,13 +198,15 @@ python -m financial_ml train --test --debug
 <a id="data-usage"></a>
 ### Usage
 
-```bash
+```python
 # 1. Download S&P 500 constituent list and prices
 python -m financial_ml market
 
 # 2. Download company fundamentals from SEC EDGAR
 python -m financial_ml fundamentals
 
+#3. Download sentiment data
+python -m financial_ml fundamentals
 # Test mode (subset of ~50 stocks)
 python -m financial_ml market --test
 python -m financial_ml fundamentals --test
@@ -266,11 +268,15 @@ python -m financial_ml train
 
 # Market data only (skip fundamentals)
 python -m financial_ml train --no-fundamentals
+
+# With sentiment data
+python -m financial_ml train --do-sentiment
+
 ```
 
 **Command specific tags**
 - `--no-fundamentals` - Train using only market data (excludes fundamental ratios)
-
+- `--save` - Saves model results.
 ### Features
 
 The model uses **14 features** spanning market and fundamental factors:

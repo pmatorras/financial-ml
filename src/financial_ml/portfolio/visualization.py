@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from financial_ml.utils.config import FIGURE_DIR, SP500_NAMES_FILE, SEPARATOR_WIDTH
+from financial_ml.utils.paths import get_fig_name
 from financial_ml.models import get_model_name
 from financial_ml.portfolio.diagnostics import calculate_model_agreement_correlations
 
@@ -75,7 +76,7 @@ def plot_correlation_matrix(preds_df, models_dict, fig_dir=FIGURE_DIR):
     plt.tight_layout()
     
     # Save figure
-    output_path = fig_dir / 'model_correlation_matrix.png'
+    output_path = fig_dir / get_fig_name('correlation', models)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -160,7 +161,7 @@ def plot_performance_vs_correlation(preds_df, models_dict, performance_dict, ref
     plt.tight_layout()
     
     # Save figure
-    output_path = fig_dir / 'performance_vs_correlation.png'
+    output_path = fig_dir / get_fig_name('performance_vs_correlation', model)
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -169,7 +170,7 @@ def plot_performance_vs_correlation(preds_df, models_dict, performance_dict, ref
     return output_path
 
 
-def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FILE, fig_dir=FIGURE_DIR):
+def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FILE, fig_dir=FIGURE_DIR, model=''):
     """
     Plot how sector concentration changes over time.
     Shows if model has stable sector bias or is sector-timing.
@@ -219,7 +220,7 @@ def plot_sector_concentration_over_time(df_portfolio, sector_file=SP500_NAMES_FI
     ax.set_ylim(0, 100)
     plt.tight_layout()
 
-    figname = fig_dir/ 'sector_drift_over_time.png'
+    figname = fig_dir/ get_fig_name(fig_type='concentration', model_name=model)
     plt.savefig(figname, dpi=300, bbox_inches='tight')
     print(f"\n✅ Saved sector drift chart: {figname}")
     
@@ -316,7 +317,9 @@ def plot_cumulative_drawdown_all(portfolio_returns, spy, equal_weight_returns, r
     axes[1].grid(alpha=0.3)
 
     plt.tight_layout()
-    figname = fig_dir / f"portfolio_backtest_{model}_{portfolio_type}_top{per_top}.png"
+    #figname = fig_dir / f"portfolio_backtest_{model}_{portfolio_type}_top{per_top}.png"
+    figname = fig_dir / get_fig_name("performance", model_name=model, p_type=portfolio_type, per_top=per_top)
+
     plt.savefig(figname, dpi=300, bbox_inches='tight')
     
     print(f"\nChart saved to {figname}")

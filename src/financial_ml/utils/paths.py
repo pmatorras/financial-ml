@@ -33,11 +33,28 @@ def get_fundamental_file(args):
     print("opening", csv_filenm)
     return csv_filenm
 
-
+def get_fig_name(fig_type, model_name, ref_model='', p_type='', per_top=''):
+    fig_name = ''
+    if fig_type=='importance':
+        fig_name =  f"importance_{model_name.lower()}.png"
+    elif fig_type=='coefficients':
+        fig_name = f"coefficients_{model_name.lower()}.png"
+    elif fig_type=='correlation':
+        fig_name = 'model_correlation_matrix.png'
+    elif fig_type=='performance_vs_correlation':
+        fig_name = f'performance_vs_correlation_{model_name}_vs{ref_model}.png'
+    elif fig_type=='concentration':
+        fig_name = f'sector_drift_{model_name}.png'
+    elif fig_type=='performance':
+        fig_name = f"portfolio_performance_{model_name}_{p_type}_top{str(per_top)}.png"
+    else:
+        print("type of figure not regognised")
+        return -1
+    return fig_name
 
 def get_dir(args, dir_type):
     '''Function to determine which folder/subfolder to choose or create'''
-    if args.debug:
+    if hasattr(args, 'debug') and args.debug:
         file_dir = DEBUG_DIR
     elif 'data' in dir_type.lower():
         file_dir = DATA_DIR
