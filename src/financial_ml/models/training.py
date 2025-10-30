@@ -48,6 +48,7 @@ def train(args):
 
     input_vars = list(market_features.values())
     market_keys = MARKET_KEYS 
+    input_keys = market_keys
     funda_keys = []
     df_keys = market_keys.copy()    
     # safe copy for concat keys
@@ -97,8 +98,8 @@ def train(args):
             wide = widen_by_canonical(prices=prices, monthly=monthly, canonical_key=tag)
             input_vars.append(wide)
             df_keys.append(tag)
-        input_keys = market_keys +  funda_keys + sentiment_keys + interaction_keys
-
+            
+    input_keys = market_keys +  funda_keys + sentiment_keys + interaction_keys
     if len(df_keys) != len(input_vars):
         print("keys and variables not the same size!")
         exit()
