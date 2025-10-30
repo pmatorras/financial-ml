@@ -16,7 +16,10 @@ from financial_ml.utils.paths import (
     get_prediction_file
     ) 
 from financial_ml.utils.logging import save_training_summary
-from financial_ml.models.definitions import get_model_name, get_models
+from financial_ml.models.definitions import(
+    get_model_name,
+    get_models
+    )
 from financial_ml.data import (
     require_non_empty,
     load_market,

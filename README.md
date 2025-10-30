@@ -4,35 +4,39 @@ A machine learning system for equity selection that predicts which S&P 500 stock
 
 ## Key Results
 
-| Metric | Strategy | SPY Benchmark | Difference |
-|--------|----------|---------------|------------|
-| **Sharpe Ratio** | **0.80** | 0.55 | +45% |
-| **Annual Return** | **17.9%** | 13.5% | +4.4% |
-| **Annual Alpha** | **2.29%** | -| - |
-| **Max Drawdown** | **-21.5%** | -24.0% | Better |
-| **Total Return (2016-2025)** | **323.6%** | ~190% | +133% |
-| **Win Rate** | **67%** | - | - |
+| Metric | Value |
+|--------|-------|
+| **Sharpe Ratio** | **0.93** |
+| **Annual Return** | **20.2%** |
+| **Max Drawdown** | **-22.9%** |
+| **Alpha vs Random** | **1.72%** |
+| **Win Rate** | **69.8%** |
+
+- **100% Long-Only Strategy:** Top 10% stocks, equal-weighted, monthly rebalancing
+- **Transaction costs included:** 10 bps per trade, ~0.5% annual drag from 42% turnover
+- **Regime awareness:** VIX-based features improve downside protection during volatile periods
+- **Statistically significant:** Sharpe ratio outperformance (p < 0.001, Bonferroni-adjusted)
 
 
-- **Statistically significance:** p < 0.001 (Bonferroni-adjusted, 3-model comparison)  
-- **Transaction costs included:** After including an estimation of transaction costs , Net alpha → 2.18% after 0.82% annual drag  
-- **Robustness across regimes:** Outperformed in COVID crash (-21.5% vs -24%) and in 2022 bear market
+![Portfolio Performance](docs/images/portfolio_performance.png)
 
-- Including a **Probability calibration** (isotonic regression) improved Sharpe from 0.71 → 0.80 (+13%)
+
 ## Pipeline Architecture
 
 The pipeline of this project follows a standard MLOps workflow: data ingestion → feature engineering → model training with time series cross-validation → portfolio construction → backtesting.
 
 ```mermaid
 flowchart TD
-    A[Market Data] --> C[Feature Engineering]
-    B[Fundamentals Data] --> C
+    A1[Sentiment Data] --> C[Feature Engineering]
+    A2[Market Data] --> C
+    A3[Fundamentals Data] --> C
     C --> D[Time Series CV & Training]
     D -.-> E[Model Evaluation]
     D --> F[Portfolio Construction]
     F -.-> G[Portfolio Diagnostics]
     F --> H[Performance vs SPY]
 ```
+
 ***
 ## Table of Contents
 - [Features](#features)
@@ -53,18 +57,19 @@ flowchart TD
 - Fetch the current S\&P 500 list, normalize tickers for the market data API, and persist the symbols table.
 - Download monthly adjusted close prices for all S\&P 500 tickers and the benchmark instrument, writing tidy CSVs for full or test universes.
 - Retrieve selected fundamentals (assets, liabilities, equity, revenues, net income, EPS, shares outstanding) from public filings and save as a long-format CSV.
-- Combine fundamentals and market information to produce ticker features (e.g momentum, volatility, ROA, ROE...).
+- Combine fundamentals and market information to produce ticker features: 13 features across **market signals** (momentum, volatility), **fundamentals** (value, quality, structure), and **regime indicators** (VIX percentile).
 - Define an excess-return land evaluate baseline classifiers with expanding-window time series splits.
 - Produce out-of-fold predictions per date and ticker for analysis and diagnostics.
-- Use the predictions for the best and worst performing tickers to generate portfolios following different strategies, to try and beat the market.
+- Use Random Forest predictions to construct **100% long-only portfolios** (top 10% confidence) with monthly rebalancing and 3-month smoothing.
 - Assess the model robustness and the qualities of the portfolios (e.g. Sharpe ratios,  profits, risks, volatity vs SPY). 
 
 ## Project structure
 The project is structured as follows (**For a more detailed explanation please refer to** [`docs/methodology.md`](docs/methodology.md)
 ):
-```bash
+```python
 financial-ml/
 ├── src/financial_ml/ # Source code
+│ ├── cli/ # Command-line interface components
 │ ├── data/ # Data pipeline & feature engineering
 │ ├── models/ # Training with time series CV
 │ ├── evaluation/ # Model diagnostics
@@ -78,12 +83,12 @@ financial-ml/
 
 **Data Pipeline (`data/`):**
 - Downloads market data (yfinance) and fundamentals (SEC EDGAR)
-- Engineers 14 features (momentum, value, quality, risk)
+- Engineers 13 features across market, fundamental, and sentiment categories
 - Handles missing data and forward-fills quarterly fundamentals
 
 **Model Training (`models/`):**
 - 3-fold expanding window time series CV
-- Trains Random Forest + isotonic calibration
+- Trains Random Forest with VIX-based regime features
 - Saves trained models and predictions
 
 **Evaluation (`evaluation/`):**
@@ -92,11 +97,20 @@ financial-ml/
 - Cross-fold performance comparison
 
 **Portfolio Construction (`portfolio/`):**
-- Selects top/bottom 10% stocks by predicted probability
-- Constructs equal-weighted long/short portfolios
-- Backtests against SPY benchmark
+- Selects top 10% stocks by predicted probability
+- Constructs 100% long-only portfolios with monthly rebalancing
+- Backtests against SPY benchmark with comprehensive diagnostics
 
+### Output & Artifacts
 
+After running the pipeline:
+
+- **Predictions:** `data/predictions/` - Out-of-fold predictions with probabilities
+- **Models:** `models/` - Trained model artifacts (.pkl files)
+- **Visualizations:** `figures/` - Portfolio performance charts, feature importance
+- **Logs:** `logs/` - Training and execution logs
+
+> For detailed directory structure, see [`docs/methodology.md`](docs/methodology.md#generated-directories).
 
 ## Installation
 
@@ -104,7 +118,7 @@ financial-ml/
 
 ### Quick Install
 
-```bash
+```python
 # Clone repository
 git clone https://github.com/pmatorras/financial-ml.git
 cd financial-ml
@@ -121,7 +135,7 @@ pip install -e .
 
 For exact dependency versions used in development:
 
-```bash
+```python
 pip install -r Requirements.txt
 pip install -e .
 ```
@@ -133,33 +147,39 @@ pip install -e .
 ### Complete ML Pipeline
 
 Run the full pipeline from data collection to backtesting:
-```bash
-# 1. Collect market data (downloads S&P 500 prices)
+```python
+# 1. Collect market, fundamentals, and sentiment data
 python -m financial_ml market
-# 2. Fetch fundamentals from SEC EDGAR
 python -m financial_ml fundamentals
+python -m financial_ml sentiment
 
-#3. Train models
+#2. Train models
 python -m financial_ml train
 
-#4. Anayse training results
+#3. Anayse training results
 python -m financial_ml analyze
 
-#5. Create portfolio and backtests
+#4. Create portfolio and backtests
 python -m financial_ml portfolio --model rf
 ```
 **Output:** Models saved to `models/`, predictions to `predictions/`, and performance plots to `figures/`.
 
+**Faster alternative using the [Makefile](Makefile):**
+```makefile
+make data #collect all data
+make train #train models only
+make backtest #Analyse training results and do portfolio
+```
 ### Fast Development Mode
 
 For quick iterations using a subset of ~50 stocks:
 
-```bash
+```python
 # Download test subset
 python -m financial_ml market --test
 
 # Train on subset (market features only, faster)
-python -m financial_ml train --test --no-fundamentals
+python -m financial_ml train --test --market-only
 
 # Backtest
 python -m financial_ml portfolio --model rf --test
@@ -178,8 +198,16 @@ Available for all commands:
 - Designed for pipeline validation with minimal data (1-2 stocks)
 - Saves artifacts to `debug/` directories with `_debug` suffix
 
+**`--do-sentiment`**
+- Includes VIX-based sentiment features
+- Improves regime awareness during volatile periods
+
+**`--market-only`**
+- Use only market features (excludes fundamentals)
+- Faster for experimentation and baseline comparisons
+
 **Examples:**
-```bash
+```python
 #Development mode (small subset)
 python -m financial_ml train --test
 
@@ -206,46 +234,32 @@ python -m financial_ml market
 python -m financial_ml fundamentals
 
 #3. Download sentiment data
-python -m financial_ml fundamentals
-# Test mode (subset of ~50 stocks)
-python -m financial_ml market --test
-python -m financial_ml fundamentals --test
+python -m financial_ml sentiment 
 ```
 **Command specific flags**
-```bash
-- `--newtable, -nt` - Refresh S&P 500 constituent list from public source
-- `--newinfo, -ni` - Redownload all historical price data (ignores cache)
 
-```
+- `--newtable`/`-nt`: Refresh S&P 500 constituent list from public source
+- `--newinfo`/`-ni`: Redownload all historical price data (ignores cache)
+
 **Caching behaviour:** By default, data files are only downloaded if they don't already exist. Use `--newtable` and `--newinfo` to force refresh.
 
 > **Note:** Market data collection and fundamentals collection are separate commands to enable independent execution. You can update constituents and prices without re-fetching fundamentals, or vice versa.
 
 ### Data sources 
 Two types of data are currently considered: market and fundamental data:
-1. **Market Data** (via yfinance)
-
+1. **Market Data** (via `yfinance`)
     - **Universe:** S\&P 500 constituents scraped from public reference
     - **Prices:** Monthly adjusted close prices for all symbols + SPY benchmark
     - **Normalization:** Ticker symbols standardized for API compatibility
 
 2. **Fundamental Data** (via SEC EDGAR API)
-
     - **Source:** Company 10-K/10-Q filings
     - **Tags:** Selected US-GAAP financial metrics (revenues, assets, equity, etc.)
     - **Processing:** Point-in-time series, de-duplicated by metric/unit/date
     - **Variants:** Multiple tag variants to handle company-specific reporting differences
 
+3. **Sentiment data** (via `yfinance`)
 > **Note:** Some fundamentals use different US-GAAP tag variants (e.g., `Revenues`, `RevenueFromContractWithCustomerExcludingAssessedTax`) to capture data across different reporting formats.
-
-<a id="data-output"></a>
-### Output Files
-
-| File | Description | 
-| :-- | :-- | 
-| `data/market/sp500_list.csv` | S\&P 500 constituent tickers | 
-| `data/market/sp500_prices.csv` | Monthly adjusted close prices | 
-| `data/fundamentals/sp500_fundamentals.csv` | Company fundamentals from SEC | 
 
 ### Target Variable
 
@@ -262,26 +276,27 @@ This creates a **relative momentum** signal focused on identifying stocks that b
 <a id="modelling-usage"></a>
 ### Usage
 
-```bash
-# Train with fundamentals (default)
-python -m financial_ml train
-
-# Market data only (skip fundamentals)
-python -m financial_ml train --no-fundamentals
-
-# With sentiment data
+```python
+# Train with fundamentals with sentiment (default)
 python -m financial_ml train --do-sentiment
 
+# With no sentiment data
+python -m financial_ml train 
+
+# Market data only (skip fundamentals)
+python -m financial_ml train --market-only
 ```
 
-**Command specific tags**
-- `--no-fundamentals` - Train using only market data (excludes fundamental ratios)
+
+#### Command specific tags
+- `--do-sentiment` - Include `VIX` data (default).
+- `--only-market` - Train using only market data (excludes fundamental ratios)
 - `--save` - Saves model results.
 ### Features
 
-The model uses **14 features** spanning market and fundamental factors:
+The model uses **13 features** spanning market and fundamental factors:
 
-**Market Signals (5):**
+**Market Signals (4):**
 - Momentum: `r12`, `mom121` (12-month trend)
 - Volatility: `vol3`, `vol12` (risk measures)
 - Price: `ClosePrice` (behavioral signal)
@@ -290,22 +305,28 @@ The model uses **14 features** spanning market and fundamental factors:
 - Value: `BookToMarket`
 - Quality: `ROE`, `ROA`, `NetMargin`
 - Structure: `Leverage`, `AssetGrowth`, `NetShareIssuance`
-- Size: `LogMktCap`
+
+**Sentiment (1):**
+- Regime: `VIXpercentile` (12-month rolling percentile for market stress detection)
+
+> Note: `ClosePrice` and `LogMktCap` were tested but excluded—their information is already captured in returns and fundamental metrics.
 
 >Full feature definitions and formulas in [`docs/methodology.md`](docs/methodology.md).
 
 ### Feature Importance:
-Top 4 features (Size, Volatility, Price, Value) account for 74% of model decisions.
+Top features driving model predictions:
+
 | Feature | Mean Importance | Interpretation |
-|---------|----------------|----------------|
-| **LogMktCap** | 37.5% ± 28.7% | Market cap (size premium) |
-| **vol12** | 15.9% ± 16.7% | 12-month volatility (risk) |
-| **ClosePrice** | 13.4% ± 16.1% | Price level (behavioral) |
-| **BookToMarket** | 8.0% ± 9.9% | Value ratio |
+|---------|-----------------|-----------------|
+| **vol12** | 25.8% | 12-month volatility (quality/risk proxy) |
+| **BookToMarket** | 23.6% | Value factor |
+| **ROA** | 13.3% | Return on assets (profitability) |
+| **NetMargin** | 8.6% | Operating efficiency |
+| **VIXpercentile** | 0.23% | Regime indicator (critical in high-volatility periods) |
 
-![Feature Importance](figures/importance_rf_cal.png)
+![Feature Importance](docs/images/feature_importance.png)
 
-> **Note:** Relatively large standard deviations reflect varying importance across folds/regimes. For example, vol12 was more critical during COVID (Fold 2) than in bull markets. This adaptability is thus desirable as the goal is for the model to adjust to market conditions rather than rigidly relying on fixed features.
+> **Note:** VIXpercentile has low average importance but provides critical protection during market stress. See [`docs/results.md`](docs/results.md) for a more detailed analysis of feature roles across market regimes.
 
 ### ML Models 
 
@@ -313,8 +334,9 @@ Three binary classifiers predict monthly stock outperformance vs. SPY benchmark:
 
 - **Logistic Regression (L1)** - Lasso regularization, `C=0.5`
 - **Logistic Regression (L2)** - Ridge regularization, `C=1.0`
-- **Random Forest** - 50 trees, `max_depth=3`
-- **Random Forest (Calibrated)** ← **Production model**
+- **Random Forest** - 50 trees, `max_depth=3`, `max_features='log2'` ← **Production model**
+- **Random Forest (Calibrated)** - Isotonic calibration (portfolio performance: worse than random)
+- **XGBoost, LightGBM, Gradient Boosting** - Boosting variants (overfit in weak-signal regimes)
 
 
 > **Configuration:** See [`models/definitions.py`](src/financial_ml/models/definitions.py) for complete pipeline specifications.
@@ -327,55 +349,40 @@ Three binary classifiers predict monthly stock outperformance vs. SPY benchmark:
 - Balance classes → `class_weight='balanced'`
 
 > Full model specifications: [`src/financial_ml/models/definitions.py`](src/financial_ml/models/definitions.py)
+
 ### Model Selection
 
 Multiple models were evaluated using 3-fold time series cross-validation:
 
-| Model | Test AUC | Sharpe Ratio | Alpha |
-|-------|----------|--------------|-------|
-| Logistic Regression L2 | 0.558 | ~0.65 | 1.5% |
-| Random Forest | 0.554 | 0.71 | 0.87% |
-| **Random Forest (Calibrated)** | **0.557** | **0.80** | **2.29%** |
-| Combination (LogReg+RF) | 0.556 | 0.71 | 2.18% | 
+| Model | Test AUC | Portfolio Sharpe | Result |
+|-------|----------|-----------------|--------|
+| Logistic Regression L1 | 0.558 | ~0.65 | Baseline |
+| Logistic Regression L2 | 0.558 | ~0.65 | Baseline |
+| **Random Forest** | **0.525** | **0.93** | ✅ **Production** |
+| Random Forest (Calibrated) | 0.526 | 0.79 | Worse with VIX |
+| XGBoost | 0.524 | 0.80 | Overfits |
+| LightGBM | 0.526 | 0.78 | Overfits |
+| Gradient Boosting | 0.526 | 0.84 | Overfits |
 
-**Final Model:** Calibrated Random Forest (`CalibratedClassifierCV` with isotonic regression)
+**Why Random Forest Wins:**
+- Random forest generally outperforms boosting in weak-signal regimes (AUC ≈ 0.525)
+- Maintains wider probability spread for portfolio selection
+- Naturally learns regime-dependent interactions with VIXpercentile
 
-Chosen model: **Random forest (Calibrated)**
-- Shows the highest risk-adjusted returns (Sharpe 0.80)
-- Superior alpha generation (2.29% vs competitors)
-- Properly calibrated probabilities (mean 0.502 vs uncalibrated 0.487)
-- Best performance on recent data (2021-2025 test fold)
+> See [`docs/results.md`](docs/results.md) and [`docs/experiments.md`](docs/experiments.md) for detailed analysis. 
 
-**Alternative approaches tested:**
-- Enhanced features (ranks, interactions): Reduced performance (-0.004 AUC)
-- Model ensembles: Diluted signal, no improvement
 
-> See [`docs/experiments.md`](docs/experiments.md) for a more in depth description of the studies.
 ### Cross-Validation
 
 **3-fold expanding window time series CV** to mimic production and prevent lookahead bias and data leakage:
 
 | Fold | Train Period | Test Period | Test AUC |
 |------|--------------|-------------|----------|
-| 1 | 2010-2016 (6 yrs) | 2016-2018 (2 yrs) | 0.563 |
-| 2 | 2010-2018 (8 yrs) | 2018-2021 (3 yrs) | 0.566 |
-| 3 | 2010-2021 (11 yrs) | 2021-2025 (4 yrs) | 0.543 |
+| 1 | 2010-2016 (6 yrs) | 2016-2018 (2 yrs) | 0.18 |
+| 2 | 2010-2018 (8 yrs) | 2018-2021 (3 yrs) | 0.517 |
+| 3 | 2010-2021 (11 yrs) | 2021-2025 (4 yrs) | 0.541 |
 
-**Average Test AUC:** 0.557
-
-**Metric:** AUC-ROC, reported per fold for transparency.
-
-
-
-<a id="modelling-output"></a>
-### Output Files
-
-| File | Description |
-| :-- | :-- |
-| `data/predictions/production/predictions_{model}.csv` | Out-of-fold predictions with probabilities |
-| `models/production/{model}.pkl` | Trained model artifacts (serialized with joblib) |
-| `models/production/feature_names.txt` | List of features used in training |
-
+**Average Test AUC:** 0.525
 
 ***
 
@@ -383,25 +390,17 @@ Chosen model: **Random forest (Calibrated)**
 
 One can analyse trained model feature importance and coefficients without retraining, simply by retrieving the models training information.
 
-<a id="evaluation-usage"></a>
 ### Usage
 
-```bash
-# Analyse all trained models
-python -m financial_ml analyze
-
-# Loads models from models/production/ by default
-# Use --debug to load models from debug directory
-python -m financial_ml analyze --debug
+```python
+python -m financial_ml analyze --model all #or any model in definitions.py
 ```
 
-<a id="evaluation-output"></a>
 ### Output
 
 - **Feature importance plots** - Random Forest feature rankings saved to `figures/`
 - **Coefficient plots** - Logistic Regression coefficients saved to `figures/`
-- **CSV exports** - Feature importance/coefficients saved to `results/feature_importance/`
-
+- **Model correlation matrix** - Heatmap showing prediction agreement across all models
 
 ### What's Analysed
 
@@ -409,55 +408,47 @@ python -m financial_ml analyze --debug
 - **Logistic Regression** - Coefficient magnitudes and signs
 - **Top features** - Ranked by contribution to predictions
 
-> **Implementation:** See [`evaluation/feature_analysis.py`](src/financial_ml/evaluation/feature_analysis.py)
+> **Implementation:** See [`evaluation/feature_analysis.py`](src/financial_ml/evaluation/feature_analysis.py) for details
 ***
 
 ## Portfolio Construction and backtesting
 
-Construct long/short portfolios from model predictions and evaluate performance against SPY benchmark.
+Construct 100% long portfolios from model predictions and evaluate performance against SPY benchmark.
 
-<a id="portfolio-usage"></a>
 ### Usage
 
-```bash
-# Run backtest with specific model
-python -m financial_ml portfolio --model rf
-python -m financial_ml portfolio --model logreg_l2
-python -m financial_ml portfolio --model logreg_l1
+```python
+python -m financial_ml portfolio --model rf # Or any other model in definitions.py
 ```
 
-
-### Portfolio Construction
-
-**Strategy:**
+### Strategy:
 
 - Long top 10% of stocks by predicted probability
-- Short bottom 10% of stocks
 - Equal-weighted positions within each leg
-- Monthly rebalancing
+- Rebalancing Monthly (last trading day)
+- Smoothing 3-month rolling average to reduce noise and turnover
 
-**Smoothing:** Optional exponential smoothing (`alpha=0.3`) to reduce prediction noise and turnover.
-
-### Metrics
+### Performance Metrics
 
 | Metric | Description |
 | :-- | :-- |
 | **Cumulative Return** | Total portfolio return over backtest period |
 | **Sharpe Ratio** | Risk-adjusted return (annualized) |
 | **Max Drawdown** | Largest peak-to-trough decline |
+| **Turnover** | Average monthly portfolio rebalancing |
+| **Win Rate** | % of months outperforming SPY |
 | **Turnover** | Average monthly portfolio churn |
 | **Beta to SPY** | Market exposure and correlation |
 
 ### Diagnostics
 
-- **Model agreement** - How often models agree on stock direction
-- **Prediction stability** - Temporal consistency of signals
-- **Beta exposure** - Long/short leg market sensitivity
+- **Sector drift** - Portfolio sector allocation vs SPY over time
+- **Model correlation** - Agreement between different model predictions
+- **Regime performance** - Returns during calm vs volatile market periods
 
-<a id="portfolio-output"></a>
 ### Output
 
-- **Performance charts** - Cumulative returns and drawdown plots saved to `figures/`
+- **Performance charts** - Cumulative returns, drawdown and sector drieft plots saved to `figures/`
 - **Backtest results** - Metrics printed to console
 
 > **Implementation:** See [`portfolio/backtest.py`](src/financial_ml/portfolio/backtest.py)

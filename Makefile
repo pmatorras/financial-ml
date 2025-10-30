@@ -33,6 +33,10 @@ market:
 fundamentals:
 	python -m financial_ml fundamentals
 
+sentiment:
+	python -m financial_ml sentiment
+
+data: market, fundamentals, sentiment
 train:
 	python -m financial_ml train 
 
@@ -41,6 +45,8 @@ analyze:
 
 portfolio:
 	python -m financial_ml  portfolio
+
+backtest: analyze, portfolio
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

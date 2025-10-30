@@ -48,7 +48,7 @@ def generate_final_figures(args):
     figures = {
         # Portfolio performance
         f'portfolio_performance.png': get_fig_name(fig_type='performance', model_name=model, p_type='100long', per_top=10),
-        f'sector_drift_.png': get_fig_name(fig_type='concentration', model_name=model),
+        f'sector_drift.png': get_fig_name(fig_type='concentration', model_name=model),
         
         # Model analysis
         f'feature_importance.png': get_fig_name(fig_type='importance', model_name=model),
