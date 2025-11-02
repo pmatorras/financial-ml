@@ -9,11 +9,8 @@ from financial_ml.cli.validators import (
 
 
 def cli():
-    parser = argparse.ArgumentParser(prog="financial_ml",
-                                     description="S&P 500 data pipeline: fetch, fundamentals, train")
-    parser.add_argument("--test", action="store_true", help="Run on test subset (≈50)")
-    parser.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
-
+    parser = argparse.ArgumentParser(prog="financial_ml", description="S&P 500 data pipeline: fetch, fundamentals, train")
+    
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_info = sub.add_parser("market", help="Download/refresh market data")
@@ -31,7 +28,6 @@ def cli():
 
     p_train.add_argument('--trim-mode', help="Do we want a trimmed version of the fundamentals?", type=str, default='trim', choices= ["trim", "all"])
     p_train.add_argument("--vix-interactions", "-vi", action="store_true", help="Calculate vix interactions")
-
     p_train.add_argument("-s", "--save", action="store_true", help="Save models")
 
 
@@ -48,10 +44,8 @@ def cli():
         sp.add_argument("--test", action="store_true", help="Run on test subset (~50)")
         sp.add_argument("-d", "--debug", action="store_true", help="Verbose debug logging")
         sp.add_argument("-v", "--verbose", action="store_true", help="Verbose additional info without doing a small debug subset")
-        sp.add_argument("--only-market", dest="only_market",
-                         help="Explicitly don't include fundamentals in training features", action="store_true")
-        sp.add_argument("--do-sentiment", dest="do_sentiment",
-                         help="Explicitly include sentimental data in training features", action="store_true")      
+        sp.add_argument("--only-market", dest="only_market", help="Explicitly don't include fundamentals in training features", action="store_true")
+        sp.add_argument("--do-sentiment", dest="do_sentiment", help="Explicitly include sentimental data in training features", action="store_true")      
         sp.add_argument('--use-enhanced', action='store_true', help='Include enhanced features (ranks, interactions, reversal)')
         sp.add_argument("--ticker", help="chose ml to display", type=list_from_string, default=None)
         sp.add_argument("--model", "-m", help="chose ml to display", type=str, default='all', choices= ["all", "logreg_l1", "logreg_l2", "rf", "rf_cal", "gb", "ensemble", "lgbm", "xgb"])
